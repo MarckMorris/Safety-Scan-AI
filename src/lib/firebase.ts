@@ -6,7 +6,7 @@ import { getStorage, FirebaseStorage } from 'firebase/storage';
 // import { getFunctions, Functions } from 'firebase/functions'; // If using Firebase Functions
 
 // Log the API key to help with debugging
-console.log("Attempting to initialize Firebase with API Key:", process.env.NEXT_PUBLIC_FIREBASE_API_KEY);
+// console.log("Attempting to initialize Firebase with API Key:", process.env.NEXT_PUBLIC_FIREBASE_API_KEY); // Removed this line
 
 const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
