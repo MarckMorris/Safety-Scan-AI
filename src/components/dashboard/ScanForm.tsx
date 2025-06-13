@@ -9,9 +9,9 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { scanUrlForVulnerabilities } from "@/ai/flows/scan-url-for-vulnerabilities";
-import type { AIScanResult, Scan } from "@/types";
+import type { AIScanResult, Scan } from "@/types"; // Keep Scan type
 import { useAuth } from "@/context/AuthContext";
-import { addDoc, collection, serverTimestamp } from "firebase/firestore";
+import { addDoc, collection, serverTimestamp, doc, updateDoc } from "firebase/firestore"; // Added doc and updateDoc
 import { db } from "@/lib/firebase";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
@@ -26,7 +26,7 @@ type ScanFormValues = z.infer<typeof scanFormSchema>;
 
 export default function ScanForm() {
   const { toast } = useToast();
-  const { user } = useAuth();
+  const { user } = useAuth(); // User will be the mock user from AuthContext
   const router = useRouter();
   const [isScanning, setIsScanning] = useState(false);
 
@@ -39,78 +39,75 @@ export default function ScanForm() {
 
   const onSubmit = async (data: ScanFormValues) => {
     if (!user) {
-      toast({ title: "Authentication Error", description: "You must be logged in to start a scan.", variant: "destructive" });
+      toast({ title: "Authentication Error (Mock)", description: "Mock user not found. This shouldn't occur in test mode.", variant: "destructive" });
       return;
     }
 
+    let scanDocId: string | null = null; 
     setIsScanning(true);
-    toast({ title: "Scan Initiated", description: `Scanning ${data.url}... This may take a few moments.` });
+    toast({ title: "Scan Initiated", description: `Scanning ${data.url}... This may take some time.` });
 
     try {
-      // 1. Create initial scan document in Firestore
-      const scanDocRef = await addDoc(collection(db, "users", user.uid, "scans"), {
+      // 1. Create initial "scanning" scan document in Firestore
+      const initialScanData = {
         userId: user.uid,
         targetUrl: data.url,
-        status: "scanning",
+        status: "scanning" as const,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
-      });
+        aiScanResult: null,
+        aiSecurityReport: null,
+        errorMessage: null,
+      };
       
-      // For immediate UI update, redirect or navigate to a pending scan page
-      // router.push(`/dashboard/scans/${scanDocRef.id}`); // Optional: redirect immediately
+      const scanDocRef = await addDoc(collection(db, "users", user.uid, "scans"), initialScanData);
+      scanDocId = scanDocRef.id;
 
-      // 2. Call the AI flow
-      // In a real app, this would be a backend task. For demo, client-side.
+      // 2. Call the AI flow (client-side, will block)
       const aiScanResult: AIScanResult = await scanUrlForVulnerabilities({ url: data.url });
 
       // 3. Update Firestore document with results
-      const updatedScanData: Partial<Scan> = {
-        status: "completed", // Or 'generating_report' if another step follows
+      const scanDocToUpdate = doc(db, "users", user.uid, "scans", scanDocId);
+      await updateDoc(scanDocToUpdate, {
+        status: "completed" as const,
         aiScanResult: aiScanResult,
         updatedAt: serverTimestamp(),
-      };
-      // For simplicity, we directly update here. In a real app, this update might come from a backend function.
-      // This is a simplified example; a full implementation might use Firebase Functions to update the doc
-      // after the AI flow completes to avoid client holding onto the process.
-      // For now, let's assume we update it client-side for this scaffold.
-      // This assumes scanDocRef.id is available from addDoc.
-      // await updateDoc(doc(db, "users", user.uid, "scans", scanDocRef.id), updatedScanData);
-      // However, to keep it simple, we'll store the full initial scan object with results directly.
-      // This is not ideal for long-running tasks.
-      const fullScanData: Omit<Scan, 'id' | 'createdAt' | 'updatedAt'> & { createdAt: any, updatedAt: any} = {
-        userId: user.uid,
-        targetUrl: data.url,
-        status: "completed",
-        aiScanResult: aiScanResult,
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
-      }
-      // Overwrite the initial placeholder document or create a new one if not redirected.
-      // For this example, let's just create a new one with full data if not redirecting.
-      // Or, ideally, the initial document should just be created, then the user redirected.
-      // The scan detail page would then poll for updates or listen to Firestore changes.
-      
-      // Let's go with creating a new doc with result and redirecting.
-      // This is simpler for scaffolding. A proper backend process is better.
-      const finalScanDocRef = await addDoc(collection(db, "users", user.uid, "scans"), fullScanData);
+      });
 
       toast({
         title: "Scan Complete",
         description: `Successfully scanned ${data.url}. View results now.`,
       });
-      router.push(`/dashboard/scans/${finalScanDocRef.id}`);
+      router.push(`/dashboard/scans/${scanDocId}`);
+      form.reset(); // Reset form after successful navigation
 
     } catch (error: any) {
-      console.error("Scan error:", error);
+      console.error("Scan process error:", error);
       toast({
         title: "Scan Failed",
-        description: error.message || "An unexpected error occurred during the scan.",
+        description: error.message || "An unexpected error occurred during the scan process.",
         variant: "destructive",
       });
-       // Update scan status to failed in Firestore if scanDocRef exists
+
+      if (scanDocId && user) {
+        try {
+          const scanDocToUpdate = doc(db, "users", user.uid, "scans", scanDocId);
+          await updateDoc(scanDocToUpdate, {
+            status: "failed" as const,
+            errorMessage: error.message || "Unknown error during scan.",
+            updatedAt: serverTimestamp(),
+          });
+          // Redirect to the scan detail page even on failure, so the user can see the failed status
+          router.push(`/dashboard/scans/${scanDocId}`);
+          form.reset(); // Reset form after navigation
+        } catch (updateError: any) {
+          console.error("Error updating scan to failed status:", updateError);
+          // If updating fails, at least reset the form and scanning state
+        }
+      }
     } finally {
       setIsScanning(false);
-      form.reset();
+      // form.reset(); // Moved reset into success/error blocks if navigation occurs
     }
   };
 
