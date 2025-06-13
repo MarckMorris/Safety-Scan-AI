@@ -1,8 +1,9 @@
 
 import { initializeApp, getApps, FirebaseApp } from 'firebase/app';
-import { getAuth, Auth } from 'firebase/auth';
+// import { getAuth, Auth } from 'firebase/auth'; // Original Auth import
 import { getFirestore, Firestore } from 'firebase/firestore';
 import { getStorage, FirebaseStorage } from 'firebase/storage';
+import type { UserCredential, User } from 'firebase/auth'; // Keep types for mock
 
 const firebaseConfigValues = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
@@ -11,119 +12,129 @@ const firebaseConfigValues = {
   storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
   messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
   appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
-  measurementId: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID, // Optional for core functionality but good to have
+  measurementId: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID,
 };
 
-// Log the raw environment variables being read by this file for debugging
-console.log("==========================================================================");
-console.log("DEBUG: Firebase Configuration Variables Being Read by src/lib/firebase.ts:");
-console.log(`- NEXT_PUBLIC_FIREBASE_API_KEY: "${process.env.NEXT_PUBLIC_FIREBASE_API_KEY}"`);
-console.log(`- NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: "${process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN}"`);
-console.log(`- NEXT_PUBLIC_FIREBASE_PROJECT_ID: "${process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID}"`);
-console.log(`- NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET: "${process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET}"`);
-console.log(`- NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: "${process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID}"`);
-console.log(`- NEXT_PUBLIC_FIREBASE_APP_ID: "${process.env.NEXT_PUBLIC_FIREBASE_APP_ID}"`);
-console.log(`- NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID: "${process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID}"`);
-console.log("--------------------------------------------------------------------------");
-
+// --- Start of Configuration Validation Logic (slightly simplified for this pass) ---
 const criticalConfigKeys: (keyof typeof firebaseConfigValues)[] = ['apiKey', 'authDomain', 'projectId', 'appId'];
 let isConfigValid = true;
-const missingOrPlaceholderKeys: string[] = [];
+const missingOrInvalidKeys: string[] = [];
 
 for (const key of criticalConfigKeys) {
   const value = firebaseConfigValues[key];
   if (!value || value.trim() === "" || value.includes("YOUR_") || value.includes("your_") || value.startsWith("[") || value.startsWith("Firebase")) {
     isConfigValid = false;
-    missingOrPlaceholderKeys.push(`NEXT_PUBLIC_FIREBASE_${key.replace(/([A-Z])/g, '_$1').toUpperCase()}`);
+    missingOrInvalidKeys.push(key);
   }
 }
 
 if (!isConfigValid) {
   const errorMessage = `
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-!!! FIREBASE INITIALIZATION FAILED !!!
+!!! FIREBASE INITIALIZATION CRITICAL ERROR !!!
 ------------------------------------------------------------------------------
-One or more critical Firebase environment variables are missing, empty, or
-still set to placeholder values in your '.env.local' file.
-
-Problematic Variable(s):
-${missingOrPlaceholderKeys.map(k => `  - ${k}: Value is "${process.env[k] || 'MISSING or NOT A STRING'}"`).join('\n')}
+The following Firebase environment variables in '.env.local' are missing,
+empty, or still set to placeholder values:
+${missingOrInvalidKeys.map(k => `  - NEXT_PUBLIC_FIREBASE_${k.replace(/([A-Z])/g, '_$1').toUpperCase()}`).join('\n')}
 
 Please take the following steps:
 1. Ensure your '.env.local' file is in the ROOT directory of your project.
 2. Open '.env.local' and verify that ALL 'NEXT_PUBLIC_FIREBASE_...'
    variables are filled with the CORRECT, ACTUAL values from your
    Firebase project console (Project settings > General > Your apps > Config).
-3. Specifically, ensure the following are not placeholders like "YOUR_...":
-   ${missingOrPlaceholderKeys.join(', \n   ')}
-4. After saving changes to '.env.local', you MUST RESTART your
+3. After saving changes to '.env.local', you MUST RESTART your
    Next.js development server (Ctrl+C in the terminal, then 'npm run dev').
 
 Firebase cannot connect without the correct configuration.
-!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-`;
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!`;
   console.error(errorMessage);
-  // Throw an error to halt further execution with bad config
-  // This makes the problem very explicit if running client-side or during build.
-  // For server-side rendering, this log might be the primary indicator.
-  if (typeof window !== 'undefined') {
-     // Only throw client-side to prevent build failures if server-side checks pass initially
-     // but client tries to re-evaluate. The console.error is the main signal.
-  }
-  // For a stricter approach, you could unconditionally throw:
-  // throw new Error("Firebase configuration error. Check server logs for details.");
-  // However, the detailed console.error above is often more immediately useful to the developer.
-  // The app will likely fail later when 'auth', 'db', or 'storage' are used if not properly initialized.
+  // Throw an error to halt initialization if critical config is missing/invalid
+  // This helps make the problem very explicit.
+  throw new Error(`Firebase configuration error: Missing or placeholder values for ${missingOrInvalidKeys.join(', ')}. Check server logs and .env.local.`);
 } else {
-  console.log("Firebase configuration variables appear to have values for all critical keys.");
-  console.log("If Firebase errors persist, ensure these values EXACTLY MATCH your Firebase project console and RESTART your server.");
+  console.log("Firebase config values (pre-initialization check passed):", firebaseConfigValues);
 }
-console.log("==========================================================================");
+// --- End of Configuration Validation Logic ---
 
 
-// Initialize Firebase
 let app: FirebaseApp;
 if (!getApps().length) {
-  // It's crucial that firebaseConfigValues are correct here.
-  // If they are not, initializeApp will likely throw its own error.
   try {
-    app = initializeApp(firebaseConfigValues as any); // Cast as any if some optional ones might be undefined
-                                                    // but critical ones were checked.
+    app = initializeApp(firebaseConfigValues as any);
   } catch (e: any) {
-    console.error("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
-    console.error("!!! Firebase initializeApp(config) FAILED! This usually means the provided values in .env.local, even if present, are not valid for Firebase.");
-    console.error("!!! Double-check:");
-    console.error("!!!   - API Key validity");
-    console.error("!!!   - Auth Domain format (e.g., your-project-id.firebaseapp.com)");
-    console.error("!!!   - Project ID correctness");
-    console.error("!!!   - App ID format");
-    console.error("!!! Ensure values EXACTLY MATCH your Firebase project console and RESTART your server.");
-    console.error("!!! Original Firebase SDK error:", e.message);
-    console.error("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
-    // Re-throw or handle as appropriate for your app's error strategy
+    console.error("Firebase initializeApp(config) FAILED:", e.message);
     throw e;
   }
 } else {
   app = getApps()[0];
 }
 
-let auth: Auth;
+// Mock Auth object
+const mockUser: User = {
+  uid: 'mockUser123',
+  email: 'test@example.com',
+  displayName: 'Mock User',
+  photoURL: null,
+  emailVerified: true,
+  isAnonymous: false,
+  metadata: {},
+  providerData: [],
+  refreshToken: '',
+  tenantId: null,
+  delete: async () => {},
+  getIdToken: async () => 'mockIdToken',
+  getIdTokenResult: async () => ({ token: 'mockIdToken', expirationTime: '', issuedAtTime: '', signInProvider: null, signInSecondFactor: null, claims: {} }),
+  reload: async () => {},
+  toJSON: () => ({}),
+  getPhoneNumber: () => null,
+  getIdTokenRefreshTime: () => null, // Added for completeness, might not exist on older SDKs or type
+  providerId: 'password', // Typically 'password' for email/pass
+};
+
+const mockAuth = {
+  createUserWithEmailAndPassword: async (authInstance: any, email: string, pass: string): Promise<UserCredential> => {
+    console.warn('Mock createUserWithEmailAndPassword called for:', email);
+    return Promise.resolve({ user: { ...mockUser, email }, operationType: 'signIn' });
+  },
+  signInWithEmailAndPassword: async (authInstance: any, email: string, pass: string): Promise<UserCredential> => {
+    console.warn('Mock signInWithEmailAndPassword called for:', email);
+    return Promise.resolve({ user: { ...mockUser, email }, operationType: 'signIn' });
+  },
+  sendPasswordResetEmail: async (authInstance: any, email: string): Promise<void> => {
+    console.warn('Mock sendPasswordResetEmail called for:', email);
+    return Promise.resolve();
+  },
+  onAuthStateChanged: (authInstance: any, callback: (user: User | null) => void): (() => void) => {
+    console.warn('Mock onAuthStateChanged called. AuthContext will provide mock user instead.');
+    // To avoid issues with AuthContext trying to use this, it's better if AuthContext doesn't call it.
+    // For now, let's simulate no user being returned by this, as AuthContext is the source of truth.
+    // callback(null); // Or call with mock user if AuthContext relied on this.
+    return () => { console.warn('Mock onAuthStateChanged unsubscribed.'); }; // Return an unsubscribe function
+  },
+  signOut: async (authInstance: any): Promise<void> => {
+    console.warn('Mock signOut called');
+    return Promise.resolve();
+  },
+  currentUser: null, // Set to null as AuthContext will provide the mock user.
+  // Add other methods if they are directly called on the 'auth' object and cause errors.
+  // For example, if updateProfile is used as auth.updateProfile (it's usually firebaseAuth.updateProfile(user, ...))
+};
+
+const auth = mockAuth as any; // Cast to Auth to satisfy type checks elsewhere
+
 let db: Firestore;
 let storage: FirebaseStorage;
 
 try {
-  auth = getAuth(app);
   db = getFirestore(app);
   storage = getStorage(app);
 } catch (e: any) {
-    console.error("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
-    console.error("!!! Error getting Firebase services (Auth, Firestore, Storage) after app initialization.");
-    console.error("!!! This can happen if initializeApp succeeded but services are misconfigured or disabled in your Firebase project.");
-    console.error("!!! Check your Firebase console settings.");
-    console.error("!!! Original Firebase SDK error:", e.message);
-    console.error("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
-    throw e;
+    console.error("Error getting Firestore/Storage services after app initialization:", e.message);
+    // Depending on how critical these are, you might throw or provide mocks too.
+    // For now, let them fail if app init passed but service init fails.
+    // This allows testing features that don't rely on db/storage.
+    db = {} as Firestore; // Provide dummy to prevent hard crash if referenced
+    storage = {} as FirebaseStorage;
 }
-
 
 export { app, auth, db, storage };

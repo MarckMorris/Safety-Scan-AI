@@ -6,8 +6,8 @@ import { useForm } from "react-hook-form";
 import * as z from "zod";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { signInWithEmailAndPassword } from "firebase/auth";
-import { auth } from "@/lib/firebase";
+// import { signInWithEmailAndPassword } from "firebase/auth"; // Firebase import removed
+// import { auth } from "@/lib/firebase"; // Firebase import removed
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
@@ -38,23 +38,25 @@ export default function LoginPage() {
 
   const onSubmit = async (data: LoginFormValues) => {
     setIsLoading(true);
-    try {
-      await signInWithEmailAndPassword(auth, data.email, data.password);
+    console.warn("Login onSubmit called with mock auth. Simulating login for:", data.email);
+    // try {
+      // await signInWithEmailAndPassword(auth, data.email, data.password); // Firebase call removed
+      await new Promise(resolve => setTimeout(resolve, 500)); // Simulate network delay
       toast({
-        title: "Login Successful",
-        description: "Welcome back!",
+        title: "Login Successful (Mock)",
+        description: "Welcome back! (Authentication is currently mocked)",
       });
       router.push("/dashboard");
-    } catch (error: any) {
-      console.error("Login error", error);
-      toast({
-        title: "Login Failed",
-        description: error.message || "An unexpected error occurred. Please try again.",
-        variant: "destructive",
-      });
-    } finally {
+    // } catch (error: any) {
+    //   console.error("Login error (Mock should not throw)", error);
+    //   toast({
+    //     title: "Login Failed (Mock)",
+    //     description: error.message || "An unexpected error occurred. Please try again.",
+    //     variant: "destructive",
+    //   });
+    // } finally {
       setIsLoading(false);
-    }
+    // }
   };
 
   return (
@@ -66,7 +68,7 @@ export default function LoginPage() {
       <Card className="w-full max-w-md shadow-2xl">
         <CardHeader className="text-center">
           <CardTitle className="text-2xl font-headline">Welcome Back</CardTitle>
-          <CardDescription>Sign in to access your dashboard and scan history.</CardDescription>
+          <CardDescription>Sign in to access your dashboard and scan history. (Auth is Mocked)</CardDescription>
         </CardHeader>
         <CardContent>
           <Form {...form}>
@@ -103,7 +105,7 @@ export default function LoginPage() {
                 </Link>
               </div>
               <Button type="submit" className="w-full" disabled={isLoading}>
-                {isLoading ? "Signing In..." : "Sign In"}
+                {isLoading ? "Signing In..." : "Sign In (Mock)"}
               </Button>
             </form>
           </Form>
