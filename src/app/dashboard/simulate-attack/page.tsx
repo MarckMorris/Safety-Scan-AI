@@ -171,7 +171,6 @@ export default function SimulateAttackPage() {
             <p className="text-muted-foreground mb-2">Simulating {attackTypes.find(at => at.value === attackType)?.label} on {targetUrl}...</p>
             <Progress value={progress} className="w-full" />
              <p className="text-xs text-muted-foreground mt-2">This is a mock simulation and may take a few moments.</p>
-          </P>
           </CardContent>
         </Card>
       )}
