@@ -3,20 +3,20 @@
 
 import ScanForm from "@/components/dashboard/ScanForm";
 import { useAuth } from "@/context/AuthContext";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Activity, AlertTriangle, CheckCircle2, History } from "lucide-react";
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Activity, AlertTriangle, CheckCircle2, History, Bot, FileText, ShieldQuestion } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 
 export default function DashboardOverviewPage() {
   const { userProfile } = useAuth();
 
-  // Placeholder data for summary cards
+  // Placeholder data for summary cards - in a real app, this would be fetched
   const summaryStats = [
-    { title: "Total Scans", value: "0", icon: <History className="w-6 h-6 text-primary" />, color: "text-primary" },
-    { title: "Vulnerabilities Found (Last 7d)", value: "0", icon: <AlertTriangle className="w-6 h-6 text-destructive" />, color: "text-destructive" },
-    { title: "Resolved Issues (Last 7d)", value: "0", icon: <CheckCircle2 className="w-6 h-6 text-green-500" />, color: "text-green-500" },
-    { title: "Active Scan Status", value: "Idle", icon: <Activity className="w-6 h-6 text-blue-500" />, color: "text-blue-500" },
+    { title: "Total Scans Conducted", value: "0", icon: <History className="w-6 h-6 text-primary" />, color: "text-primary", link: "/dashboard/scans" },
+    { title: "Critical Vulnerabilities (Active)", value: "0", icon: <AlertTriangle className="w-6 h-6 text-destructive" />, color: "text-destructive", link: "/dashboard/scans?severity=Critical" },
+    { title: "AI Recommendations Pending", value: "0", icon: <Bot className="w-6 h-6 text-blue-500" />, color: "text-blue-500", link: "/dashboard/scans?status=pending_report" },
+    { title: "Simulated Attacks Run", value: "0", icon: <ShieldQuestion className="w-6 h-6 text-orange-500" />, color: "text-orange-500", link: "/dashboard/simulate-attack" },
   ];
 
   return (
@@ -27,42 +27,70 @@ export default function DashboardOverviewPage() {
             Welcome, {userProfile?.displayName || "User"}!
           </h1>
           <p className="text-muted-foreground">
-            Ready to secure your applications? Start a new scan or review your history.
+            Your security overview. Start a new scan or review past results.
           </p>
         </div>
-        <Button asChild>
-          <Link href="/dashboard/scans">View Scan History</Link>
-        </Button>
+        <div className="flex gap-2">
+          <Button asChild>
+            <Link href="/dashboard/scans">View Scan History</Link>
+          </Button>
+           <Button asChild variant="outline">
+            <Link href="/dashboard/simulate-attack">Simulate Attack</Link>
+          </Button>
+        </div>
       </div>
 
+      {/* Summary Cards */}
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
         {summaryStats.map((stat) => (
-          <Card key={stat.title} className="shadow-md">
+          <Card key={stat.title} className="shadow-md hover:shadow-lg transition-shadow">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">{stat.title}</CardTitle>
               {stat.icon}
             </CardHeader>
-            <CardContent>
+            <CardContent className="pb-2">
               <div className={`text-2xl font-bold ${stat.color}`}>{stat.value}</div>
-              {/* <p className="text-xs text-muted-foreground">+20.1% from last month</p> */}
             </CardContent>
+            {stat.link && (
+                 <CardFooter className="pt-0">
+                    <Button variant="link" size="sm" className="p-0 h-auto text-xs" asChild>
+                        <Link href={stat.link}>View Details</Link>
+                    </Button>
+                </CardFooter>
+            )}
           </Card>
         ))}
       </div>
-
+      
+      {/* New Scan Form */}
       <div>
         <ScanForm />
       </div>
 
-      {/* Placeholder for recent activity or alerts */}
+      {/* Placeholder for Quick Overview of Latest Threats and AI Recommendations */}
       <Card className="shadow-md">
         <CardHeader>
-          <CardTitle className="font-headline">Recent Activity</CardTitle>
-          <CardDescription>No recent activity to display.</CardDescription>
+          <CardTitle className="font-headline flex items-center"><Bot className="mr-2 h-6 w-6 text-primary"/>Latest Threats & AI Recommendations</CardTitle>
+          <CardDescription>Highlights from recent scans and general security advisories.</CardDescription>
         </CardHeader>
-        <CardContent>
-          <p className="text-sm text-muted-foreground">Your latest scan activities and critical alerts will appear here.</p>
+        <CardContent className="space-y-4">
+          <div className="border p-4 rounded-lg bg-secondary/30">
+            <h3 className="font-semibold text-primary">High Priority: Update Framework XYZ</h3>
+            <p className="text-sm text-muted-foreground">A critical vulnerability (CVE-2023-XXXX) was found in Framework XYZ affecting version 2.1. We recommend updating to version 2.2 immediately.</p>
+            <Button variant="link" size="sm" className="p-0 h-auto mt-1">Learn More (Placeholder)</Button>
+          </div>
+          <div className="border p-4 rounded-lg bg-secondary/30">
+            <h3 className="font-semibold text-orange-600">AI Insight: Common Misconfiguration Detected</h3>
+            <p className="text-sm text-muted-foreground">Our AI analysis of recent public breaches indicates a rise in attacks targeting misconfigured S3 buckets. Ensure your storage permissions are reviewed.</p>
+             <Button variant="link" size="sm" className="p-0 h-auto mt-1">Best Practices (Placeholder)</Button>
+          </div>
+          <p className="text-xs text-muted-foreground text-center">This section is for demonstration and uses placeholder data.</p>
         </CardContent>
+        <CardFooter>
+            <Button variant="outline" className="w-full">
+                View All Security Advisories (Placeholder)
+            </Button>
+        </CardFooter>
       </Card>
     </div>
   );

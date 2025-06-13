@@ -17,13 +17,11 @@ export interface Vulnerability {
   affectedFile?: string;
 }
 
-// Matches ScanUrlForVulnerabilitiesOutput from src/ai/flows/scan-url-for-vulnerabilities.ts
 export interface AIScanResult {
   vulnerabilities: Vulnerability[];
   summary: string;
 }
 
-// Matches GenerateSecurityImprovementReportOutput from src/ai/flows/generate-security-improvement-report.ts
 export interface AISecurityReport {
   report: string;
 }
@@ -32,9 +30,45 @@ export interface Scan {
   userId: string;
   targetUrl: string;
   status: 'queued' | 'scanning' | 'generating_report' | 'completed' | 'failed';
-  aiScanResult?: AIScanResult;
-  aiSecurityReport?: AISecurityReport;
-  errorMessage?: string;
+  aiScanResult?: AIScanResult | null; // Allow null for initial state
+  aiSecurityReport?: AISecurityReport | null; // Allow null
+  errorMessage?: string | null; // Allow null
   createdAt: Timestamp;
   updatedAt: Timestamp;
+}
+
+// Types for Simulated Attack Module (placeholder for now)
+export type AttackType = "sqli" | "xss" | "brute-force" | "header-spoofing" | "rate-limiting";
+
+export interface SimulatedAttackConfig {
+  targetUrl: string;
+  attackType: AttackType;
+  // Specific parameters for different attacks can be added here
+  // e.g., loginPageUrl for brute-force, specific headers for spoofing
+}
+
+export interface SimulatedAttackReport {
+  id: string;
+  userId: string;
+  simulationConfig: SimulatedAttackConfig;
+  status: "pending" | "running" | "completed" | "failed";
+  riskLevel?: "Low" | "Medium" | "High" | "Critical";
+  summary: string;
+  findings: Array<{
+    description: string;
+    evidence?: string; // e.g., error message, successful payload
+    mitigation?: string;
+  }>;
+  createdAt: Timestamp;
+  updatedAt: Timestamp;
+}
+
+// Types for AI Patch Suggestion Engine
+export interface AIPatchSuggestion {
+  vulnerabilityType: string;
+  vulnerabilityDescription: string;
+  affectedComponent: string; // e.g., "login.php line 52" or "UserRegistrationForm component"
+  suggestedCodePatch: string;
+  explanation: string; // Why it's insecure + why the fix works
+  language?: string; // e.g., 'javascript', 'python', 'php'
 }

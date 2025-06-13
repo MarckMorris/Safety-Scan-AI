@@ -13,22 +13,23 @@ import {
   SidebarTrigger,
   SidebarInset,
   SidebarFooter
-} from '@/components/ui/sidebar'; // Assuming this is the correct path to your enhanced sidebar
+} from '@/components/ui/sidebar';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { ShieldAlert, ScanLine, History, UserCircle, Settings, LifeBuoy, Users } from 'lucide-react';
+import { ShieldAlert, ScanLine, History, UserCircle, Settings, LifeBuoy, Users, ShieldQuestion, Activity } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/context/AuthContext';
 
 const navItems = [
   { href: '/dashboard', label: 'Overview & New Scan', icon: ScanLine },
   { href: '/dashboard/scans', label: 'Scan History', icon: History },
+  { href: '/dashboard/simulate-attack', label: 'Simulate Attack', icon: ShieldQuestion },
   { href: '/dashboard/account', label: 'Account Settings', icon: UserCircle },
 ];
 
 const adminNavItems = [
     { href: '/admin/users', label: 'User Management', icon: Users },
-    { href: '/admin/system', label: 'System Logs', icon: Settings },
+    { href: '/admin/system', label: 'System Logs', icon: Activity }, // Changed icon
 ];
 
 export default function DashboardLayout({
@@ -69,8 +70,8 @@ export default function DashboardLayout({
               ))}
               {userProfile?.role === 'admin' && (
                 <>
-                  <SidebarMenuItem className="mt-4 mb-1">
-                    <span className="text-xs text-muted-foreground px-2 group-data-[collapsible=icon]:hidden">Admin</span>
+                  <SidebarMenuItem className="mt-4 mb-1 px-2 group-data-[collapsible=icon]:hidden">
+                    <span className="text-xs text-muted-foreground uppercase font-semibold">Admin Panel</span>
                   </SidebarMenuItem>
                   {adminNavItems.map((item) => (
                      <SidebarMenuItem key={item.href}>
@@ -90,9 +91,11 @@ export default function DashboardLayout({
             </SidebarMenu>
           </SidebarContent>
            <SidebarFooter className="p-4 group-data-[collapsible=icon]:p-2 mt-auto border-t">
-              <Button variant="outline" className="w-full justify-start group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:w-auto">
-                <LifeBuoy className="w-5 h-5 group-data-[collapsible=icon]:mr-0 mr-2" />
-                <span className="group-data-[collapsible=icon]:hidden">Support</span>
+              <Button variant="outline" className="w-full justify-start group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:w-auto" asChild>
+                <Link href="/contact">
+                    <LifeBuoy className="w-5 h-5 group-data-[collapsible=icon]:mr-0 mr-2" />
+                    <span className="group-data-[collapsible=icon]:hidden">Support</span>
+                </Link>
               </Button>
           </SidebarFooter>
         </Sidebar>
