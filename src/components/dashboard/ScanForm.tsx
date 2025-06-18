@@ -30,7 +30,7 @@ const processScanInBackground = async (
     scanId: string,
     targetUrl: string,
     initialScanDataBase: Omit<Scan, 'id' | 'userId' | 'targetUrl' | 'status' | 'aiScanResult' | 'aiSecurityReport' | 'errorMessage'>,
-    toastFn: ReturnType<typeof useToast>['toast']
+    toastFn: ReturnType<typeof useToast>['toast'] // Keep toastFn if needed for direct errors here, though detail page handles most.
 ) => {
     console.log(`[processScanInBackground] Initiated for scan ID: ${scanId}, User: ${userId}, URL: ${targetUrl}`);
     const scanDocRef = doc(db, "users", userId, "scans", scanId);
@@ -40,7 +40,7 @@ const processScanInBackground = async (
         const initialFullScanData: Omit<Scan, 'id'> = {
             userId,
             targetUrl,
-            status: "scanning",
+            status: "scanning", // Start as "scanning"
             createdAt: initialScanDataBase.createdAt,
             updatedAt: initialScanDataBase.updatedAt,
             aiScanResult: null,
@@ -49,7 +49,7 @@ const processScanInBackground = async (
         };
         console.log(`[processScanInBackground] Attempting to set initial document for scan ID: ${scanId}`, initialFullScanData);
         await setDoc(scanDocRef, initialFullScanData);
-        console.log(`[processScanInBackground] Initial scan document CREATED in Firestore for ID: ${scanId}`);
+        console.log(`[processScanInBackground] Initial scan document CREATED in Firestore for ID: ${scanId} with status 'scanning'.`);
 
         // 2. Perform the AI scan (currently mocked and fast)
         console.log(`[processScanInBackground] Calling AI scan (scanUrlForVulnerabilities) for URL: ${targetUrl}`);
@@ -66,40 +66,60 @@ const processScanInBackground = async (
         console.log(`[processScanInBackground] Attempting to update Firestore document to 'completed' for ID: ${scanId} with data:`, updateData);
         await updateDoc(scanDocRef, updateData);
         console.log(`[processScanInBackground] Firestore document UPDATED to 'completed' for ID: ${scanId}`);
-        // Toast for success is best handled by the detail page observing the change.
-        // toastFn({ title: "Scan Complete", description: `Scan for ${targetUrl} finished successfully.` });
-
+        // Success toast is better handled by the detail page observing the change.
 
     } catch (error: any) {
         console.error(`[processScanInBackground] CRITICAL ERROR during processing for scan ID ${scanId}:`, error);
+        if (error instanceof Error) {
+            console.error(`[processScanInBackground] Error Name: ${error.name}`);
+            console.error(`[processScanInBackground] Error Message: ${error.message}`);
+            console.error(`[processScanInBackground] Error Stack: ${error.stack}`);
+        } else {
+            console.error(`[processScanInBackground] Non-Error object thrown:`, JSON.stringify(error, null, 2));
+        }
+        
         try {
             const errorUpdateData = {
                 status: "failed" as const,
                 errorMessage: error.message || "Unknown error during scan processing.",
-                aiScanResult: null, // Ensure these are cleared on failure
+                aiScanResult: null,
                 aiSecurityReport: null,
                 updatedAt: serverTimestamp(),
             };
             console.log(`[processScanInBackground] Attempting to update Firestore document to 'failed' for ID: ${scanId} due to error. Update data:`, errorUpdateData);
-            await updateDoc(scanDocRef, errorUpdateData);
-            console.log(`[processScanInBackground] Firestore document UPDATED to 'failed' for ID: ${scanId}`);
-        } catch (updateError) {
-            console.error(`[processScanInBackground] CRITICAL: Failed to update scan doc ${scanId} to 'failed' state after initial error:`, updateError);
+            // Use updateDoc, assuming the doc might have been created before the error.
+            // If setDoc failed, this updateDoc will also fail if the doc doesn't exist,
+            // but it's a good attempt to mark it as failed.
+            await updateDoc(scanDocRef, errorUpdateData).catch(async (updateErr) => {
+                 // If update failed because doc doesn't exist (e.g. setDoc failed), try setDoc for error state
+                console.warn(`[processScanInBackground] updateDoc for failed status failed (likely no initial doc), trying setDoc for scan ID ${scanId}`, updateErr);
+                await setDoc(scanDocRef, {
+                     userId,
+                     targetUrl,
+                     status: "failed" as const,
+                     createdAt: initialScanDataBase.createdAt, // Or Timestamp.now() if original is unavailable
+                     updatedAt: serverTimestamp(),
+                     aiScanResult: null,
+                     aiSecurityReport: null,
+                     errorMessage: error.message || "Unknown error during scan processing.",
+                });
+            });
+            console.log(`[processScanInBackground] Firestore document status updated/set to 'failed' for ID: ${scanId}`);
+        } catch (updateError: any) {
+            console.error(`[processScanInBackground] CRITICAL: Failed to update/set scan doc ${scanId} to 'failed' state after initial error:`, updateError);
+            if (updateError instanceof Error) {
+                console.error(`[processScanInBackground] Update/Set Error Name: ${updateError.name}`);
+                console.error(`[processScanInBackground] Update/Set Error Message: ${updateError.message}`);
+            }
         }
-        // This toast might be missed if it relies on ScanForm context, but good for logging.
-        // It's better to reflect failure status on the detail page.
-        toastFn({
-            title: "Scan Processing Failed",
-            description: `Error processing scan for ${targetUrl}. Details: ${error.message || 'Unknown error'}. Check scan details page.`,
-            variant: "destructive",
-        });
+        // Failure toast is better handled by detail page observing the 'failed' status.
     }
 };
 
 
 export default function ScanForm() {
   const { toast } = useToast();
-  const { user } = useAuth(); // Mocked user is available here
+  const { user } = useAuth(); 
   const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -115,12 +135,11 @@ export default function ScanForm() {
     if (!user || !user.uid) { 
       toast({ title: "Authentication Error", description: "User not found. Cannot start scan.", variant: "destructive" });
       console.error("[ScanForm - onSubmit] User or user.uid not found.");
-      setIsSubmitting(false); // Reset submitting state
+      setIsSubmitting(false);
       return;
     }
 
     setIsSubmitting(true);
-    // Toast that it's queued, navigation will show progress
     toast({ title: "Scan Initiated", description: `Scan for ${data.url} is being initiated. You'll be redirected.` });
     console.log(`[ScanForm - onSubmit] User ID: ${user.uid}, Target URL: ${data.url}`);
 
@@ -128,40 +147,32 @@ export default function ScanForm() {
     console.log(`[ScanForm - onSubmit] Generated client-side scan ID: ${clientSideScanId}`);
     const now = Timestamp.now(); 
 
-    // Data for the background processing function, only contains immutable parts for initial record
     const initialScanDataBaseForBackground = { 
         createdAt: now,
-        updatedAt: now, // This will be overwritten by serverTimestamp on updates
+        updatedAt: now,
     };
-
-    // Navigate immediately. Pass targetUrl as query param for ScanDetailPage to use if Firestore data is not yet available
-    // and scanId as well for immediate use.
+    
+    // Navigate immediately. Pass targetUrl and scanId as query params.
     router.push(`/dashboard/scans/${clientSideScanId}?targetUrl=${encodeURIComponent(data.url)}`);
     console.log(`[ScanForm - onSubmit] Navigated to /dashboard/scans/${clientSideScanId}`);
     
-    // Call the processing function asynchronously (fire-and-forget from this form's perspective)
+    // Call the processing function asynchronously
     processScanInBackground(user.uid, clientSideScanId, data.url, initialScanDataBaseForBackground, toast)
         .then(() => {
-            console.log(`[ScanForm - onSubmit] processScanInBackground for ${clientSideScanId} has completed its asynchronous execution path (doesn't mean success/failure of scan, just that the async function itself finished).`);
+            console.log(`[ScanForm - onSubmit] processScanInBackground for ${clientSideScanId} promise resolved (doesn't indicate success/failure of scan itself).`);
         })
         .catch((e) => {
-            // This catch is for errors in *initiating* processScanInBackground, not errors *within* it.
-            console.error(`[ScanForm - onSubmit] CRITICAL Error trying to start processScanInBackground for ${clientSideScanId}:`, e);
-            // Potentially show a more critical error toast here if even launching the background task fails
+            console.error(`[ScanForm - onSubmit] CRITICAL Error starting processScanInBackground for ${clientSideScanId}:`, e);
             toast({
                 title: "Scan Initiation Failed Critically",
-                description: `Could not even start the scan process for ${data.url}. Please try again.`,
+                description: `Could not start the scan process for ${data.url}. Please try again.`,
                 variant: "destructive",
             });
         });
 
     form.reset();
-    // setIsSubmitting will be reset by component unmount after navigation.
-    // If navigation somehow fails or is very slow, and the component remains mounted,
-    // this could lead to the button remaining in a disabled state.
-    // However, the router.push should be quite fast.
-    // To be absolutely safe, one could add:
-    // setTimeout(() => setIsSubmitting(false), 2000); // Reset after a delay if still on page
+    // setIsSubmitting will be reset effectively by unmounting or can be reset after a short delay
+    // For now, relying on navigation to unmount/remount if needed.
   };
 
   return (
