@@ -38,7 +38,7 @@ export type ScanUrlForVulnerabilitiesOutput = z.infer<typeof ScanUrlForVulnerabi
 
 // This is the actual function that will be called by the application
 export async function scanUrlForVulnerabilities(input: ScanUrlForVulnerabilitiesInput): Promise<ScanUrlForVulnerabilitiesOutput> {
-  console.log(`[Mock AI Flow] scanUrlForVulnerabilities called for URL: ${input.url}. Simulating slight delay...`);
+  console.log(`[Mock AI Flow - scanUrlForVulnerabilities] Called for URL: ${input.url}. Simulating slight delay...`);
   
   // Simulate a very short delay to mimic network/processing time
   await new Promise(resolve => setTimeout(resolve, 1500 + Math.random() * 1000)); // 1.5 to 2.5 seconds
@@ -74,21 +74,31 @@ export async function scanUrlForVulnerabilities(input: ScanUrlForVulnerabilities
       }
     ]
   };
-  console.log('[Mock AI Flow] Returning mock result:', mockResult);
+  console.log('[Mock AI Flow - scanUrlForVulnerabilities] Returning mock result:', mockResult);
   return mockResult;
 }
 
 // The Genkit flow definition below is now mostly for structure, as the actual logic is simplified above.
 // In a real scenario, this flow would contain the prompt and AI call.
+// However, to ensure the exported function is used directly, we call it within the flow.
 const scanUrlForVulnerabilitiesFlow = ai.defineFlow(
   {
-    name: 'scanUrlForVulnerabilitiesFlow', // Keep name consistent for potential future use
+    name: 'scanUrlForVulnerabilitiesFlow', // Keep name consistent for Genkit registry
     inputSchema: ScanUrlForVulnerabilitiesInputSchema,
     outputSchema: ScanUrlForVulnerabilitiesOutputSchema,
   },
   async (input) => {
     // This flow definition will call our simplified exported function directly.
+    // This ensures that any Genkit internal mechanisms are still triggered
+    // but the core logic is our fast mock.
+    console.log(`[Genkit Flow - scanUrlForVulnerabilitiesFlow] Invoking the direct mock function for URL: ${input.url}`);
     const result = await scanUrlForVulnerabilities(input); 
+    console.log(`[Genkit Flow - scanUrlForVulnerabilitiesFlow] Mock function returned, result:`, result);
     return result;
   }
 );
+
+// We are exporting the direct function `scanUrlForVulnerabilities` for use in `ScanForm.tsx`.
+// The `scanUrlForVulnerabilitiesFlow` defined with `ai.defineFlow` is also present.
+// The key is that our application code directly calls `scanUrlForVulnerabilities`.
+// If Genkit tooling were to call 'scanUrlForVulnerabilitiesFlow', it would also end up executing our mock.
