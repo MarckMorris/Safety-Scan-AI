@@ -11,15 +11,15 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
-import { PlusCircle, Search, ListFilter, LayoutGrid, Loader2, History, AlertTriangle, Download } from "lucide-react";
+import { PlusCircle, Search, ListFilter, LayoutGrid, Loader2, History, AlertTriangle, Download, CheckCircle, Clock } from "lucide-react"; // Added CheckCircle, Clock
 import { Skeleton } from "@/components/ui/skeleton";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { formatDistanceToNow, format } from 'date-fns';
+import { format } from 'date-fns'; // Removed formatDistanceToNow as it wasn't used here directly
 
 // Mock scan data for UI testing if Firestore fails or is empty
-const mockScansData: Scan[] = [
+export const mockScansData: Scan[] = [
   {
     id: "mock1", userId: "mockUser123", targetUrl: "https://vulnerable-example.com", status: "completed",
     createdAt: Timestamp.fromDate(new Date(Date.now() - 86400000 * 2)), // 2 days ago
@@ -104,8 +104,8 @@ export default function ScanHistoryPage() {
     
     const unsubscribe = onSnapshot(q, (querySnapshot) => {
       const scansData = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Scan));
-      if (scansData.length === 0) {
-        setScans(mockScansData); // Use mock data if Firestore returns empty
+      if (scansData.length === 0 && !searchTerm && filterStatus === "all" && filterSeverity === "all") { // Only show mock if no filters and no real data
+        setScans(mockScansData); 
         setShowMockDataMessage(true);
       } else {
         setScans(scansData);
@@ -121,7 +121,7 @@ export default function ScanHistoryPage() {
     });
 
     return () => unsubscribe();
-  }, [user, sortOrder]);
+  }, [user, sortOrder, searchTerm, filterStatus, filterSeverity]); // Added filter dependencies to re-evaluate mock data showing
 
   const filteredScans = scans
     .filter(scan => 
@@ -142,7 +142,7 @@ export default function ScanHistoryPage() {
   };
 
 
-  if (loading) { // Show skeleton only during initial true loading state
+  if (loading && scans.length === 0) { // Show skeleton only during initial true loading state and no data yet (even mock)
     return (
         <div className="space-y-6">
             <div className="flex flex-col md:flex-row justify-between items-center gap-4">
@@ -193,7 +193,7 @@ export default function ScanHistoryPage() {
               <div className="flex items-center gap-2">
                 <AlertTriangle className="h-5 w-5 text-amber-600" />
                 <p className="text-sm text-amber-700">
-                  Displaying mock data. Real scan history could not be loaded or is empty. This is for UI demonstration purposes.
+                  Displaying mock data. Real scan history could not be loaded or is currently empty based on your filters. This is for UI demonstration purposes.
                 </p>
               </div>
             </CardContent>
@@ -292,7 +292,7 @@ export default function ScanHistoryPage() {
                         <TableCell className="text-xs text-muted-foreground">{format(scan.createdAt.toDate(), "MMM dd, yyyy")}</TableCell>
                         <TableCell>
                             <Button variant="outline" size="sm" asChild>
-                            <Link href={`/dashboard/scans/${scan.id}`}>Details</Link>
+                            <Link href={`/dashboard/scans/${scan.id}?targetUrl=${encodeURIComponent(scan.targetUrl)}`}>Details</Link>
                             </Button>
                         </TableCell>
                         </TableRow>
@@ -305,9 +305,11 @@ export default function ScanHistoryPage() {
                 <History className="mx-auto h-16 w-16 text-muted-foreground mb-4" />
                 <h3 className="text-xl font-semibold">No Scans Found</h3>
                 <p className="text-muted-foreground">
-                    {scans.length === 0 && !showMockDataMessage ? "You haven't performed any scans yet." : "No scans match your current filters."}
+                    {scans.length === 0 && !showMockDataMessage && !searchTerm && filterStatus === 'all' && filterSeverity === 'all'
+                     ? "You haven't performed any scans yet." 
+                     : "No scans match your current filters."}
                 </p>
-                {scans.length === 0 && !showMockDataMessage && (
+                {scans.length === 0 && !showMockDataMessage && !searchTerm && filterStatus === 'all' && filterSeverity === 'all' && (
                     <Button asChild className="mt-4">
                         <Link href="/dashboard">Start Your First Scan</Link>
                     </Button>
@@ -319,3 +321,5 @@ export default function ScanHistoryPage() {
     </div>
   );
 }
+
+    
