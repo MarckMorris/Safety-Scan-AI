@@ -11,14 +11,16 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
-import { PlusCircle, Search, ListFilter, LayoutGrid, Loader2, History, AlertTriangle, Download, CheckCircle, Clock } from "lucide-react"; // Added CheckCircle, Clock
+import { PlusCircle, Search, ListFilter, LayoutGrid, Loader2, History, AlertTriangle, Download, CheckCircle, Clock } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { format } from 'date-fns'; // Removed formatDistanceToNow as it wasn't used here directly
+import { format } from 'date-fns';
+import { useToast } from "@/hooks/use-toast";
 
-// Mock scan data for UI testing if Firestore fails or is empty
+
+// Mock scan data for UI testing if Firestore fails or is empty - This will no longer be used directly as a fallback.
 export const mockScansData: Scan[] = [
   {
     id: "mock1", userId: "mockUser123", targetUrl: "https://vulnerable-example.com", status: "completed",
@@ -75,24 +77,22 @@ const getStatusIcon = (status: Scan["status"]) => {
 
 export default function ScanHistoryPage() {
   const { user } = useAuth();
+  const { toast } = useToast();
   const [scans, setScans] = useState<Scan[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [filterStatus, setFilterStatus] = useState("all");
-  const [filterSeverity, setFilterSeverity] = useState("all"); // New filter
+  const [filterSeverity, setFilterSeverity] = useState("all");
   const [sortOrder, setSortOrder] = useState("desc");
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
-  const [showMockDataMessage, setShowMockDataMessage] = useState(false);
 
 
   useEffect(() => {
     if (!user) {
-      setLoading(false);
-      // If no real user (even mock from context is null), consider showing mock data for UI demo.
-      // However, our mock auth context always provides a user.
-      // This path might be hit if context somehow fails.
-      setScans(mockScansData);
-      setShowMockDataMessage(true);
+      setLoading(false); 
+      // User not available, set scans to empty and loading to false.
+      // This might happen if AuthContext hasn't initialized or if logout occurs.
+      setScans([]);
       return;
     }
 
@@ -104,24 +104,21 @@ export default function ScanHistoryPage() {
     
     const unsubscribe = onSnapshot(q, (querySnapshot) => {
       const scansData = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Scan));
-      if (scansData.length === 0 && !searchTerm && filterStatus === "all" && filterSeverity === "all") { // Only show mock if no filters and no real data
-        setScans(mockScansData); 
-        setShowMockDataMessage(true);
-      } else {
-        setScans(scansData);
-        setShowMockDataMessage(false);
-      }
+      setScans(scansData);
       setLoading(false);
     }, (error) => {
       console.error("Error fetching scans:", error);
-      // On error, fall back to mock data for UI demonstration
-      setScans(mockScansData);
-      setShowMockDataMessage(true);
+      toast({
+        title: "Error Fetching Scans",
+        description: "Could not load scan history from the database. Please try again later.",
+        variant: "destructive",
+      });
+      setScans([]); // Set to empty array on error
       setLoading(false);
     });
 
     return () => unsubscribe();
-  }, [user, sortOrder, searchTerm, filterStatus, filterSeverity]); // Added filter dependencies to re-evaluate mock data showing
+  }, [user, sortOrder, toast]);
 
   const filteredScans = scans
     .filter(scan => 
@@ -138,11 +135,14 @@ export default function ScanHistoryPage() {
   
   const handleExportAllReports = () => {
     // Placeholder for exporting all reports (e.g., as a zip of PDFs or a summary CSV)
-    alert("Exporting all reports (placeholder functionality). This would typically generate a batch export.");
+    toast({
+        title: "Export Initiated (Placeholder)",
+        description: "This would typically generate a batch export of the displayed scan reports as PDFs.",
+    });
   };
 
 
-  if (loading && scans.length === 0) { // Show skeleton only during initial true loading state and no data yet (even mock)
+  if (loading && scans.length === 0) { 
     return (
         <div className="space-y-6">
             <div className="flex flex-col md:flex-row justify-between items-center gap-4">
@@ -187,18 +187,6 @@ export default function ScanHistoryPage() {
             </Button>
         </div>
       </div>
-       {showMockDataMessage && (
-          <Card className="border-amber-500 bg-amber-50">
-            <CardContent className="p-4">
-              <div className="flex items-center gap-2">
-                <AlertTriangle className="h-5 w-5 text-amber-600" />
-                <p className="text-sm text-amber-700">
-                  Displaying mock data. Real scan history could not be loaded or is currently empty based on your filters. This is for UI demonstration purposes.
-                </p>
-              </div>
-            </CardContent>
-          </Card>
-        )}
 
       <Card className="shadow-md">
         <CardHeader>
@@ -257,7 +245,7 @@ export default function ScanHistoryPage() {
             </div>
         </CardHeader>
         <CardContent>
-            {filteredScans.length > 0 ? (
+            {!loading && filteredScans.length > 0 ? (
                 viewMode === "grid" ? (
                 <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                     {filteredScans.map((scan) => (
@@ -300,20 +288,26 @@ export default function ScanHistoryPage() {
                     </TableBody>
                 </Table>
                 )
-            ) : (
+            ) : !loading && filteredScans.length === 0 ? (
                 <div className="text-center py-12">
                 <History className="mx-auto h-16 w-16 text-muted-foreground mb-4" />
                 <h3 className="text-xl font-semibold">No Scans Found</h3>
                 <p className="text-muted-foreground">
-                    {scans.length === 0 && !showMockDataMessage && !searchTerm && filterStatus === 'all' && filterSeverity === 'all'
+                    {scans.length === 0 && !searchTerm && filterStatus === 'all' && filterSeverity === 'all'
                      ? "You haven't performed any scans yet." 
                      : "No scans match your current filters."}
                 </p>
-                {scans.length === 0 && !showMockDataMessage && !searchTerm && filterStatus === 'all' && filterSeverity === 'all' && (
+                {scans.length === 0 && !searchTerm && filterStatus === 'all' && filterSeverity === 'all' && (
                     <Button asChild className="mt-4">
                         <Link href="/dashboard">Start Your First Scan</Link>
                     </Button>
                 )}
+                </div>
+            ) : null }
+             {loading && filteredScans.length === 0 && ( // Show loader only if still loading and no filtered scans yet
+                <div className="flex justify-center items-center py-12">
+                    <Loader2 className="h-10 w-10 animate-spin text-primary" />
+                    <p className="ml-3 text-muted-foreground">Loading scan history...</p>
                 </div>
             )}
         </CardContent>
