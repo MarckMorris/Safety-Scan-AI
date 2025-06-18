@@ -11,8 +11,8 @@ import VulnerabilityItem from "@/components/dashboard/VulnerabilityItem";
 import ReportDisplay from "@/components/dashboard/ReportDisplay";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, CheckCircle, AlertTriangle, Clock, Loader2, FileText, Download, Wand2, Code, AlertCircle, Info } from "lucide-react";
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle, AccordionItem, AccordionTrigger, AccordionContent } from "@/components/ui/card"; // Added Accordion types
-import { Accordion } from "@/components/ui/accordion";
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from "@/components/ui/accordion";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
 import { generateSecurityImprovementReport } from "@/ai/flows/generate-security-improvement-report";
@@ -66,84 +66,92 @@ export default function ScanDetailPage() {
 
 
   useEffect(() => {
-    if (!user || !scanId) {
-        setLoading(false);
+    if (!scanId) {
+      router.push("/dashboard/scans"); // Redirect if scanId is missing
+      return;
+    }
+    
+    setLoading(true);
+
+    // If user is not available (e.g. mock auth failed, or initial load), 
+    // try to use mock data for UI demo if a mock scanId matches.
+    if (!user) {
         const mockScan = mockScansData.find(s => s.id === scanId);
         if (mockScan) {
             setScan(mockScan);
-            // Consider if toast is needed here, could contribute to issues if rapidly changing
-            // toast({ title: "Displaying Mock Scan", description: "User or Scan ID invalid, showing mock data.", variant: "default" });
         } else {
-            // toast({ title: "Error", description: "User or Scan ID missing. Cannot load scan.", variant: "destructive" });
-            router.push("/dashboard/scans");
+             // If no mock user and no matching mock scan, behavior might depend on requirements.
+             // For now, let's assume it should go back or show 'not found' after timeout.
+            console.warn(`Scan detail page: User not available, and no mock scan for ID ${scanId}. Waiting for timeout or Firestore data.`);
         }
-        return;
+        // setLoading will be handled by timeout or Firestore listener
     }
 
-    setLoading(true); // Set loading true at the beginning of data fetching
-    const scanDocRef = doc(db, "users", user.uid, "scans", scanId);
 
-    const unsubscribe = onSnapshot(scanDocRef, (docSnap) => {
-      if (docSnap.exists()) {
-        const scanData = { id: docSnap.id, ...docSnap.data() } as Scan;
-        setScan(scanData);
-        if (scanData.status === "failed" && scanData.errorMessage && !toastTimeouts.has(`fail-${scanId}`)) {
-            toast({ title: `Scan Failed: ${scanData.targetUrl}`, description: scanData.errorMessage, variant: "destructive" });
-            toastTimeouts.set(`fail-${scanId}`, setTimeout(() => toastTimeouts.delete(`fail-${scanId}`), 5000));
+    const scanDocRef = user ? doc(db, "users", user.uid, "scans", scanId) : null;
+    let unsubscribe: (() => void) | null = null;
+
+    if (scanDocRef) {
+        unsubscribe = onSnapshot(scanDocRef, (docSnap) => {
+        if (docSnap.exists()) {
+            const scanData = { id: docSnap.id, ...docSnap.data() } as Scan;
+            setScan(scanData);
+            if (scanData.status === "failed" && scanData.errorMessage && !toastTimeouts.has(`fail-${scanId}`)) {
+                toast({ title: `Scan Failed: ${scanData.targetUrl}`, description: scanData.errorMessage, variant: "destructive" });
+                toastTimeouts.set(`fail-${scanId}`, setTimeout(() => toastTimeouts.delete(`fail-${scanId}`), 5000));
+            }
+            setLoading(false);
+        } else {
+            console.log(`Scan document ${scanId} not found in Firestore. Current user: ${user?.uid}.`);
+            // Attempt to set a temporary 'queued' state if initialTargetUrl is present,
+            // this helps the UI show something while waiting for the background process to create the doc.
+            if (!scan && initialTargetUrl && user) {
+                setScan({
+                    id: scanId,
+                    userId: user.uid,
+                    targetUrl: initialTargetUrl,
+                    status: 'queued', // Or 'scanning' if ScanForm sets it directly
+                    createdAt: Timestamp.now(), // Placeholder, actual time will be from Firestore
+                    updatedAt: Timestamp.now(),
+                    aiScanResult: null,
+                    aiSecurityReport: null,
+                });
+            }
+            // Keep loading as true, timeout will handle if doc never appears
+        }
+        }, (error) => {
+        console.error("Error fetching scan details with onSnapshot:", error);
+        toast({ title: "Error Fetching Scan", description: "Could not fetch scan details. Trying mock data.", variant: "destructive" });
+        const mockScan = mockScansData.find(s => s.id === scanId);
+        if (mockScan) {
+            setScan(mockScan);
         }
         setLoading(false);
-      } else {
-        console.log(`Scan document ${scanId} not found initially. Waiting briefly...`);
-        if (!scan && initialTargetUrl) {
-            setScan({
-                id: scanId,
-                userId: user.uid,
-                targetUrl: initialTargetUrl,
-                status: 'queued',
-                createdAt: Timestamp.now(),
-                updatedAt: Timestamp.now(),
-                aiScanResult: null,
-                aiSecurityReport: null,
-            });
-            // Still loading as we expect the real doc or timeout
-        }
-        // Don't set loading false immediately if we expect it to appear or timeout
-      }
-    }, (error) => {
-      console.error("Error fetching scan details with onSnapshot:", error);
-      toast({ title: "Error Fetching Scan", description: "Could not fetch scan details. Trying mock data.", variant: "destructive" });
-      const mockScan = mockScansData.find(s => s.id === scanId);
-      if (mockScan) {
-          setScan(mockScan);
-      }
-      setLoading(false);
-    });
+        });
+    }
+
 
     const timer = setTimeout(() => {
-        // Check if scan is still null *and* loading is still true (meaning onSnapshot hasn't resolved or errored yet)
         if (loading && !scan) { 
             setLoading(false);
-            toast({ title: "Scan Not Found", description: "The scan data could not be loaded after a timeout. Please try again or check history.", variant: "destructive" });
             const mockScan = mockScansData.find(s => s.id === scanId);
             if (mockScan) {
                 setScan(mockScan);
-                // toast({ title: "Displaying Mock Scan", description: "Real scan not found after timeout, showing mock data.", variant: "default" });
+                toast({ title: "Loading Timeout", description: "Displaying mock data for this scan as live data could not be loaded.", variant: "default" });
             } else {
+                 toast({ title: "Scan Not Found", description: "The scan data could not be loaded after a timeout. Please try again or check history.", variant: "destructive" });
                  router.push("/dashboard/scans");
             }
         }
-    }, 7000);
+    }, 7000); // 7 seconds timeout
 
     return () => {
-        unsubscribe();
+        if (unsubscribe) unsubscribe();
         clearTimeout(timer);
-        toastTimeouts.forEach(clearTimeout); // Clear any pending toast timeouts
+        toastTimeouts.forEach(clearTimeout);
         toastTimeouts.clear();
     };
-  // IMPORTANT: Removed 'loading' and 'scan' from dependencies.
-  // 'initialTargetUrl' is memoized. 'toast' and 'router' are stable.
-  // 'toastTimeouts' is memoized.
-  }, [user, scanId, router, toast, initialTargetUrl, toastTimeouts]);
+  }, [scanId, user, router, toast, initialTargetUrl, toastTimeouts]); // Removed scan and loading from dependencies
 
 
   const handleGenerateReport = async () => {
@@ -160,17 +168,15 @@ export default function ScanDetailPage() {
     const scanDocRef = doc(db, "users", user.uid, "scans", scan.id);
     
     try {
-      // Optimistically update local state first, then Firestore
       setScan(prev => prev ? {...prev, status: "generating_report"} : null);
       await updateDoc(scanDocRef, { status: "generating_report", updatedAt: serverTimestamp() });
 
-      const aiReportOutput = await generateSecurityImprovementReport({ // Renamed to avoid conflict with AISecurityReport type
+      const aiReportOutput = await generateSecurityImprovementReport({
         scanResults: JSON.stringify(scan.aiScanResult),
       });
       
       const newReport: AISecurityReport = { report: aiReportOutput.report };
 
-      // Optimistically update local state, then Firestore
       setScan(prev => prev ? {...prev, aiSecurityReport: newReport, status: "completed", updatedAt: Timestamp.now()} : null);
       await updateDoc(scanDocRef, {
         aiSecurityReport: newReport,
@@ -182,9 +188,7 @@ export default function ScanDetailPage() {
     } catch (error: any) {
       console.error("Error generating report:", error);
       toast({ title: "Report Generation Failed", description: error.message || "Could not generate report.", variant: "destructive" });
-      // Revert local state if Firestore update fails or was optimistic
-      setScan(prev => prev ? {...prev, status: "completed"} : null); // Revert to completed, report might not be there
-      // Attempt to update Firestore status back to completed if it was changed to generating_report
+      setScan(prev => prev ? {...prev, status: "completed"} : null);
       await updateDoc(scanDocRef, { status: "completed", updatedAt: serverTimestamp() }).catch(err => console.error("Failed to revert status to completed", err));
     } finally {
       setIsGeneratingReport(false);
@@ -244,7 +248,7 @@ export default function ScanDetailPage() {
     );
   }
 
-  if (!scan && !loading) { // If loading is false and scan is still null
+  if (!scan && !loading) {
     return (
       <div className="text-center py-10">
         <AlertCircle className="mx-auto h-12 w-12 text-destructive mb-4" />
@@ -420,3 +424,4 @@ export default function ScanDetailPage() {
   );
 }
 
+    
