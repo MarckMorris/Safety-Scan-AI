@@ -10,7 +10,7 @@ import type {
 } from "@/components/ui/toast"
 
 const TOAST_LIMIT = 1
-const TOAST_REMOVE_DELAY = 1000000
+const TOAST_REMOVE_DELAY = 1000 * 60 * 5 // Keep toasts for 5 minutes after dismissal before removing from state
 
 type ToasterToast = ToastProps & {
   id: string
@@ -93,62 +93,56 @@ export const reducer = (state: State, action: Action): State => {
 
     case "DISMISS_TOAST": {
       const { toastId } = action;
-      let stateChanged = false;
 
-      // Ensure toastId exists for specific dismissal before queueing
-      if (toastId && state.toasts.find(t => t.id === toastId && t.open)) {
-         addToRemoveQueue(toastId);
-         stateChanged = true; // Will definitely change 'open' status
-      } else if (!toastId) { // Dismiss all toasts
-        state.toasts.forEach((toast) => {
-          if (toast.open) {
-            addToRemoveQueue(toast.id);
-            stateChanged = true; // At least one toast's 'open' status will change
-          } else {
-            // If already closed, ensure it's in the queue (idempotent check in addToRemoveQueue)
-            addToRemoveQueue(toast.id);
-          }
-        });
+      if (toastId === undefined) { // Dismiss all toasts
+        const allAlreadyClosed = state.toasts.every(t => !t.open);
+        if (allAlreadyClosed) {
+            // Still ensure they are queued for removal if not already
+            state.toasts.forEach(t => addToRemoveQueue(t.id));
+            return state; // All were already closed, no change to 'open' states, return original state object
+        }
+        // At least one toast needs to be closed
+        state.toasts.forEach(t => addToRemoveQueue(t.id));
+        return {
+            ...state,
+            toasts: state.toasts.map((t) => t.open ? { ...t, open: false } : t),
+        };
       }
 
-
-      const newToasts = state.toasts.map((t) => {
-        if (t.id === toastId || toastId === undefined) {
-          if (t.open === false) { // If already dismissed, return same object instance
-            return t;
-          }
-          // If stateChanged wasn't true before, it is now.
-          // This path (t.open was true) is the primary path where stateChanged becomes true for a specific toast.
-          if (!stateChanged && t.open) stateChanged = true;
-          return { ...t, open: false };
-        }
-        return t;
-      });
-
-      // If no toast's `open` status was actually changed to `false`
-      // (e.g. dismissing an already dismissed toast or a non-existent one),
-      // and the array itself hasn't changed (no toasts removed by other means), return original state.
-      if (!stateChanged && state.toasts.length === newToasts.length && state.toasts.every((t, i) => t === newToasts[i]) ) {
-        // Still ensure the specific toastId (if provided) is in remove queue,
-        // as it might be called for an already closed toast to ensure it's eventually removed.
-        if (toastId && state.toasts.find(t => t.id === toastId)) {
-             addToRemoveQueue(toastId);
-        }
-        return state;
+      // Dismiss specific toast
+      const targetToastIndex = state.toasts.findIndex(t => t.id === toastId);
+      if (targetToastIndex === -1) {
+          return state; // Toast not found, return original state object
       }
 
+      const targetToast = state.toasts[targetToastIndex];
+      if (!targetToast.open) {
+          addToRemoveQueue(toastId); // Ensure it's queued for removal
+          return state; // Already closed, no change to 'open' status, return original state object
+      }
+
+      // Toast found and is open, mark it as closed
+      addToRemoveQueue(toastId);
+      // Create a new array with the modified toast
+      const newToasts = state.toasts.map((t, index) => 
+        index === targetToastIndex ? { ...targetToast, open: false } : t
+      );
       return {
-        ...state,
-        toasts: newToasts,
+          ...state,
+          toasts: newToasts,
       };
     }
     case "REMOVE_TOAST":
       if (action.toastId === undefined) {
+        // If all toasts are already removed, return original state
+        if(state.toasts.length === 0) return state;
         return {
           ...state,
           toasts: [],
         }
       }
+      // If the specific toast to remove doesn't exist, return original state
+      if (!state.toasts.find(t => t.id === action.toastId)) return state;
       return {
         ...state,
         toasts: state.toasts.filter((t) => t.id !== action.toastId),
@@ -163,9 +157,8 @@ let memoryState: State = { toasts: [] }
 function dispatch(action: Action) {
   const previousState = memoryState;
   memoryState = reducer(memoryState, action)
-  // Only notify listeners if the state object reference has changed,
-  // or if specific deep changes indicate a need to re-render.
-  // For simplicity here, we assume reducer returns new state object if changed.
+
+  // Only notify listeners if the state object reference has changed.
   if (memoryState !== previousState) {
     listeners.forEach((listener) => {
       listener(memoryState)
@@ -208,14 +201,22 @@ function useToast() {
   const [state, setState] = React.useState<State>(memoryState)
 
   React.useEffect(() => {
-    listeners.push(setState)
+    const callback = (newState: State) => {
+      // Ensure we only call setState if the part of the state we care about changed
+      // For useToast, it's primarily the toasts array.
+      // If memoryState didn't change its reference in dispatch, this listener wouldn't be called.
+      // If it did, we update our local component state.
+      setState(newState);
+    };
+
+    listeners.push(callback);
     return () => {
-      const index = listeners.indexOf(setState)
+      const index = listeners.indexOf(callback);
       if (index > -1) {
-        listeners.splice(index, 1)
+        listeners.splice(index, 1);
       }
-    }
-  }, [state])
+    };
+  }, []); // Empty dependency array: subscribe/unsubscribe once.
 
   return {
     ...state,
