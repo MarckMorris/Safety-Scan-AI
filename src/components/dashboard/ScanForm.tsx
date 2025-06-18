@@ -27,10 +27,10 @@ type ScanFormValues = z.infer<typeof scanFormSchema>;
 // Helper function to perform the actual scan and update Firestore
 // This function will be called without awaiting it in the main onSubmit flow
 const performScanAndUpdateDb = async (
-    userId: string, 
-    scanDocId: string, 
-    url: string, 
-    toast: ReturnType<typeof useToast>['toast']
+    userId: string,
+    scanDocId: string,
+    url: string,
+    toastFn: ReturnType<typeof useToast>['toast'] // Pass toast function explicitly
 ) => {
     console.log(`[ScanForm - performScanAndUpdateDb] Starting AI scan for doc ID: ${scanDocId}, URL: ${url}`);
     try {
@@ -45,12 +45,10 @@ const performScanAndUpdateDb = async (
             errorMessage: null,
         });
         console.log(`[ScanForm - performScanAndUpdateDb] Firestore updated to completed for doc ID: ${scanDocId}`);
-        // Toasting here might be missed if user has navigated away or if it's too quick
-        // The scan detail page should reflect the final status
+        // Consider a toast on the scan detail page after data loads, rather than here.
     } catch (error: any) {
         console.error(`[ScanForm - performScanAndUpdateDb] Error during AI scan or Firestore update for doc ID: ${scanDocId}`, error);
         
-        // Update Firestore document with failure status
         const scanDocToUpdate = doc(db, "users", userId, "scans", scanDocId);
         try {
             await updateDoc(scanDocToUpdate, {
@@ -64,10 +62,11 @@ const performScanAndUpdateDb = async (
         } catch (updateError) {
             console.error(`[ScanForm - performScanAndUpdateDb] CRITICAL: Failed to update scan doc ${scanDocId} to failed state after error:`, updateError);
         }
-        // Toasting here might also be missed.
-        toast({ // Use the passed toast instance
+        // This toast might be missed if navigation is too fast or user context changes.
+        // It's better to show errors on the scan detail page.
+        toastFn({ 
             title: "Scan Processing Failed",
-            description: `An error occurred while processing the scan for ${url}. Check scan details.`,
+            description: `Error processing scan for ${url}. Details on scan page.`,
             variant: "destructive",
         });
     }
@@ -76,7 +75,7 @@ const performScanAndUpdateDb = async (
 
 export default function ScanForm() {
   const { toast } = useToast();
-  const { user } = useAuth(); 
+  const { user } = useAuth();
   const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -96,12 +95,12 @@ export default function ScanForm() {
     }
 
     setIsSubmitting(true);
-    toast({ title: "Scan Queued", description: `Scan for ${data.url} is being initiated. Redirecting...` });
+    // Toast that it's queued, UI will show spinning
+    toast({ title: "Scan Queued", description: `Scan for ${data.url} is being initiated...` });
     console.log(`[ScanForm - onSubmit] User ID: ${user.uid}, Target URL: ${data.url}`);
 
     let scanDocId: string | null = null;
     try {
-      // 1. Create initial "scanning" scan document in Firestore
       const initialScanData = {
         userId: user.uid,
         targetUrl: data.url,
@@ -118,15 +117,16 @@ export default function ScanForm() {
       scanDocId = scanDocRef.id;
       console.log(`[ScanForm - onSubmit] Initial scan document created with ID: ${scanDocId}`);
 
-      // 2. IMPORTANT: Do NOT await the long-running task here.
       // Call the helper function to perform the scan and update in the "background".
+      // Pass the toast function from useToast() hook.
       performScanAndUpdateDb(user.uid, scanDocId, data.url, toast);
       console.log(`[ScanForm - onSubmit] performScanAndUpdateDb called for doc ID: ${scanDocId}. It will run asynchronously.`);
 
-      // 3. Redirect immediately to the scan detail page
+      // Redirect immediately to the scan detail page
       router.push(`/dashboard/scans/${scanDocId}`);
       console.log(`[ScanForm - onSubmit] Redirecting to /dashboard/scans/${scanDocId}`);
-      form.reset(); 
+      form.reset();
+      //setIsSubmitting(false); // This will be unmounted, so not strictly necessary.
 
     } catch (error: any) {
       console.error("[ScanForm - onSubmit] Error during initial Firestore doc creation or redirection:", error);
@@ -135,18 +135,11 @@ export default function ScanForm() {
         description: error.message || "Could not initiate the scan. Please try again.",
         variant: "destructive",
       });
-      // If doc creation failed, scanDocId might be null.
-      // If it succeeded but redirection failed, the async task might still run.
-      // This part of error handling is tricky as the async task is detached.
-    } finally {
-      // Only set isSubmitting to false if we didn't redirect or if an error occurred before redirection intent
-      // If redirection is successful, the component unmounts, so this state change might not matter.
-      // However, if initial addDoc fails, we need to re-enable the button.
-      if (!scanDocId) { // Indicates initial addDoc likely failed
-          setIsSubmitting(false);
-          console.log("[ScanForm - onSubmit] Resetting isSubmitting to false due to error before/during doc creation.");
-      }
+      setIsSubmitting(false); // Re-enable form if initial doc creation failed
+      console.log("[ScanForm - onSubmit] Resetting isSubmitting to false due to error before/during doc creation.");
     }
+    // No finally setIsSubmitting(false) here because if successful, component unmounts.
+    // If addDoc fails, the catch block handles setIsSubmitting.
   };
 
   return (
@@ -188,4 +181,3 @@ export default function ScanForm() {
     </Card>
   );
 }
-

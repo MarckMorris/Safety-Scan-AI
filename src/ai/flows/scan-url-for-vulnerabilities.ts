@@ -1,6 +1,8 @@
+
 'use server';
 /**
- * @fileOverview Scans a URL for common vulnerabilities, SQL injection points, unprotected APIs, insecure HTTP headers, and outdated dependencies.
+ * @fileOverview Scans a URL for common vulnerabilities.
+ * FOR TESTING: This flow now returns a MOCK result almost instantly.
  *
  * - scanUrlForVulnerabilities - A function that handles the URL scanning process.
  * - ScanUrlForVulnerabilitiesInput - The input type for the scanUrlForVulnerabilities function.
@@ -9,12 +11,14 @@
 
 import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
+import type { AIScanResult } from '@/types'; // Import for the output type
 
 const ScanUrlForVulnerabilitiesInputSchema = z.object({
   url: z.string().url().describe('The URL to scan for vulnerabilities.'),
 });
 export type ScanUrlForVulnerabilitiesInput = z.infer<typeof ScanUrlForVulnerabilitiesInputSchema>;
 
+// Output schema matches AIScanResult structure
 const ScanUrlForVulnerabilitiesOutputSchema = z.object({
   vulnerabilities: z.array(
     z.object({
@@ -31,38 +35,49 @@ const ScanUrlForVulnerabilitiesOutputSchema = z.object({
 });
 export type ScanUrlForVulnerabilitiesOutput = z.infer<typeof ScanUrlForVulnerabilitiesOutputSchema>;
 
+
+// This is the actual function that will be called by the application
 export async function scanUrlForVulnerabilities(input: ScanUrlForVulnerabilitiesInput): Promise<ScanUrlForVulnerabilitiesOutput> {
-  return scanUrlForVulnerabilitiesFlow(input);
+  console.log(`[Mock AI Flow] scanUrlForVulnerabilities called for URL: ${input.url}`);
+  
+  // Simulate a very short delay
+  await new Promise(resolve => setTimeout(resolve, 500));
+
+  // Return a hardcoded mock result
+  const mockResult: AIScanResult = {
+    summary: `Mock scan completed for ${input.url}. This is a test result. Found 2 mock vulnerabilities.`,
+    vulnerabilities: [
+      {
+        type: "Mock SQL Injection",
+        severity: "Critical",
+        description: "This is a mock SQL Injection vulnerability found at the login form (simulated).",
+        affectedUrl: `${input.url}/login`
+      },
+      {
+        type: "Mock XSS",
+        severity: "High",
+        description: "This is a mock Cross-Site Scripting vulnerability found in the search parameter (simulated).",
+        affectedUrl: `${input.url}/search?q=<script>alert("mock")</script>`
+      }
+    ]
+  };
+  console.log('[Mock AI Flow] Returning mock result:', mockResult);
+  return mockResult;
 }
 
-const prompt = ai.definePrompt({
-  name: 'scanUrlForVulnerabilitiesPrompt',
-  input: {schema: ScanUrlForVulnerabilitiesInputSchema},
-  output: {schema: ScanUrlForVulnerabilitiesOutputSchema},
-  prompt: `You are a security expert tasked with scanning a given URL for potential vulnerabilities.
-
-  Analyze the URL and identify common security vulnerabilities, including but not limited to:
-  - OWASP Top 10 vulnerabilities
-  - SQL injection points
-  - Exposed or unprotected APIs
-  - Insecure HTTP headers
-  - Outdated or vulnerable dependencies
-
-  Provide a detailed report of the findings, including the type of vulnerability, severity (Low, Medium, High, Critical), description, and affected URL or file (if applicable).
-  Also, provide a summary of the scan results in natural language.
-
-  URL to scan: {{{url}}}
-  `,
-});
+// The Genkit flow definition below is now mostly for structure, as the actual logic is simplified above.
+// In a real scenario, this flow would contain the prompt and AI call.
 
 const scanUrlForVulnerabilitiesFlow = ai.defineFlow(
   {
-    name: 'scanUrlForVulnerabilitiesFlow',
+    name: 'scanUrlForVulnerabilitiesFlow', // Keep name consistent for potential future use
     inputSchema: ScanUrlForVulnerabilitiesInputSchema,
     outputSchema: ScanUrlForVulnerabilitiesOutputSchema,
   },
-  async input => {
-    const {output} = await prompt(input);
-    return output!;
+  async (input) => {
+    // This flow definition will call our simplified exported function directly.
+    // No separate prompt needed for this mock version.
+    const result = await scanUrlForVulnerabilities(input); // Call the simplified function
+    return result;
   }
 );

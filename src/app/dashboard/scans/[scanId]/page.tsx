@@ -4,19 +4,22 @@
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
-import { doc, getDoc, updateDoc, serverTimestamp, Timestamp } from "firebase/firestore";
+import { doc, getDoc, updateDoc, serverTimestamp, Timestamp, onSnapshot } from "firebase/firestore"; // Added onSnapshot
 import { db } from "@/lib/firebase";
-import type { Scan, AISecurityReport, Vulnerability } from "@/types";
+import type { Scan, AISecurityReport, Vulnerability, AIPatchSuggestion } from "@/types";
 import VulnerabilityItem from "@/components/dashboard/VulnerabilityItem";
 import ReportDisplay from "@/components/dashboard/ReportDisplay";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, CheckCircle, AlertTriangle, Clock, Loader2, RefreshCw, FileText, Download, Wand2, Code, AlertCircle } from "lucide-react";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { Accordion } from "@/components/ui/accordion";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion"; // Ensure these are imported
 import { useToast } from "@/hooks/use-toast";
 import { generateSecurityImprovementReport } from "@/ai/flows/generate-security-improvement-report";
 import { Badge } from "@/components/ui/badge";
 import { format } from 'date-fns';
+// Import mockScansData for fallback if needed, and also to provide structure if Firestore fails completely.
+import { mockScansData } from "@/app/dashboard/scans/page";
+
 
 const getStatusBadgeVariant = (status: Scan["status"]): "default" | "secondary" | "destructive" | "outline" => {
   switch (status) {
@@ -31,25 +34,17 @@ const getStatusIcon = (status: Scan["status"]) => {
   switch (status) {
     case "completed": return <CheckCircle className="w-5 h-5 text-green-500" />;
     case "failed": return <AlertTriangle className="w-5 h-5 text-destructive" />;
-    case "scanning": case "generating_report": return <Loader2 className="w-5 h-5 animate-spin text-blue-500" />;
-    case "queued": return <Clock className="w-5 h-5 text-muted-foreground" />;  
+    case "scanning": case "generating_report": return <Loader2 className="w-5 h-5 animate-spin text-primary" />; // Use primary for scanning
+    case "queued": return <Clock className="w-5 h-5 text-muted-foreground" />;
     default: return <Clock className="w-5 h-5 text-muted-foreground" />;
   }
 };
-
-// Placeholder for AI Patch Suggestion data
-interface AIPatchSuggestion {
-  vulnerabilityType: string;
-  affectedComponent: string; // e.g., "login.php line 52" or "UserRegistrationForm component"
-  suggestion: string; // The code snippet
-  explanation: string;
-}
 
 
 export default function ScanDetailPage() {
   const params = useParams();
   const scanId = params.scanId as string;
-  const { user } = useAuth();
+  const { user } = useAuth(); // Mocked user
   const router = useRouter();
   const { toast } = useToast();
 
@@ -60,42 +55,65 @@ export default function ScanDetailPage() {
   const [isLoadingPatches, setIsLoadingPatches] = useState(false);
 
   useEffect(() => {
-    if (!user || !scanId) return;
+    if (!user || !scanId) {
+        setLoading(false); // Stop loading if no user or scanId
+        // Try to load mock scan if ID matches and user is somehow null (though mock user is always set)
+        const mockScan = mockScansData.find(s => s.id === scanId);
+        if (mockScan) {
+            setScan(mockScan);
+            toast({ title: "Displaying Mock Scan", description: "User or Scan ID missing, showing mock data.", variant: "default" });
+        } else {
+            toast({ title: "Error", description: "User or Scan ID missing. Cannot load scan.", variant: "destructive" });
+            router.push("/dashboard/scans");
+        }
+        return;
+    }
 
     setLoading(true);
     const scanDocRef = doc(db, "users", user.uid, "scans", scanId);
-    
-    const fetchScan = async () => {
-        try {
-            const docSnap = await getDoc(scanDocRef);
-            if (docSnap.exists()) {
-                setScan({ id: docSnap.id, ...docSnap.data() } as Scan);
-            } else {
-                toast({ title: "Error", description: "Scan not found. It might be a mock scan.", variant: "destructive" });
-                // Attempt to load mock scan if ID matches
-                const mockScan = (await import('@/app/dashboard/scans/page.tsx').then(m => m.mockScansData || [])).find(s => s.id === scanId);
-                if (mockScan) {
-                    setScan(mockScan);
-                    toast({ title: "Displaying Mock Scan", description: "Real scan not found in database, showing mock data.", variant: "default" });
-                } else {
-                    router.push("/dashboard/scans");
-                }
-            }
-        } catch (error) {
-            console.error("Error fetching scan details:", error);
-            toast({ title: "Error", description: "Could not fetch scan details. Trying mock data.", variant: "destructive" });
-            const mockScan = (await import('@/app/dashboard/scans/page.tsx').then(m => m.mockScansData || [])).find(s => s.id === scanId);
-            if (mockScan) setScan(mockScan); else router.push("/dashboard/scans");
-        } finally {
-            setLoading(false);
+
+    // Use onSnapshot for real-time updates
+    const unsubscribe = onSnapshot(scanDocRef, (docSnap) => {
+      if (docSnap.exists()) {
+        const scanData = { id: docSnap.id, ...docSnap.data() } as Scan;
+        setScan(scanData);
+        if (scanData.status === "failed" && scanData.errorMessage) {
+            toast({ title: `Scan Failed: ${scanData.targetUrl}`, description: scanData.errorMessage, variant: "destructive" });
+        } else if (scanData.status === "completed" && !scanData.aiScanResult) {
+            // This case might indicate an issue if it completes without results
+            console.warn("Scan completed but no AI scan results found for scan ID:", scanId);
         }
-    };
-    fetchScan();
+      } else {
+        toast({ title: "Scan Not Found", description: "The scan may have been deleted or does not exist. Trying mock data.", variant: "destructive" });
+        const mockScan = mockScansData.find(s => s.id === scanId);
+        if (mockScan) {
+            setScan(mockScan);
+            toast({ title: "Displaying Mock Scan", description: "Real scan not found, showing mock data.", variant: "default" });
+        } else {
+            router.push("/dashboard/scans");
+        }
+      }
+      setLoading(false);
+    }, (error) => {
+      console.error("Error fetching scan details with onSnapshot:", error);
+      toast({ title: "Error Fetching Scan", description: "Could not fetch scan details in real-time. Trying mock data.", variant: "destructive" });
+      const mockScan = mockScansData.find(s => s.id === scanId);
+        if (mockScan) {
+            setScan(mockScan);
+        } else {
+             // router.push("/dashboard/scans"); // Avoid redirecting if mock also fails
+             console.error("Mock scan also not found for ID:", scanId);
+        }
+      setLoading(false);
+    });
+
+    return () => unsubscribe(); // Cleanup listener on unmount
   }, [user, scanId, router, toast]);
 
+
   const handleGenerateReport = async () => {
-    if (!scan || !scan.aiScanResult || !user || scan.id.startsWith("mock")) { // Don't try for mock scans
-      toast({ title: "Cannot Generate Report", description: "Scan data is incomplete, user not found, or this is a mock scan.", variant: "destructive" });
+    if (!scan || !scan.aiScanResult || !user || scan.id.startsWith("mock-")) {
+      toast({ title: "Cannot Generate Report", description: "Scan data incomplete, user not found, or this is a mock scan.", variant: "destructive" });
       return;
     }
 
@@ -103,27 +121,29 @@ export default function ScanDetailPage() {
     const scanDocRef = doc(db, "users", user.uid, "scans", scanId);
     
     try {
-      await updateDoc(scanDocRef, { status: "generating_report", updatedAt: serverTimestamp() });
+      // Optimistically update local state and Firestore
       setScan(prev => prev ? {...prev, status: "generating_report"} : null);
+      await updateDoc(scanDocRef, { status: "generating_report", updatedAt: serverTimestamp() });
 
       const aiReport: AISecurityReport = await generateSecurityImprovementReport({
         scanResults: JSON.stringify(scan.aiScanResult),
       });
 
+      // Update local state and Firestore with the generated report
+      setScan(prev => prev ? {...prev, aiSecurityReport: aiReport, status: "completed", updatedAt: Timestamp.now()} : null);
       await updateDoc(scanDocRef, {
         aiSecurityReport: aiReport,
         status: "completed",
         updatedAt: serverTimestamp(),
       });
-      
-      setScan(prev => prev ? {...prev, aiSecurityReport: aiReport, status: "completed", updatedAt: Timestamp.now()} : null);
       toast({ title: "Report Generated", description: "Security improvement report successfully generated." });
 
     } catch (error: any) {
       console.error("Error generating report:", error);
       toast({ title: "Report Generation Failed", description: error.message || "Could not generate report.", variant: "destructive" });
+      // Revert status if generation failed
+      setScan(prev => prev ? {...prev, status: "completed"} : null); // Or original status if known
       await updateDoc(scanDocRef, { status: "completed", updatedAt: serverTimestamp() });
-      setScan(prev => prev ? {...prev, status: "completed"} : null);
     } finally {
       setIsGeneratingReport(false);
     }
@@ -136,13 +156,14 @@ export default function ScanDetailPage() {
     }
     setIsLoadingPatches(true);
     // Placeholder: In a real app, call a Genkit flow here
-    // e.g., const suggestions = await generatePatchSuggestionsFlow({ vulnerabilities: scan.aiScanResult.vulnerabilities });
     await new Promise(resolve => setTimeout(resolve, 1500)); // Simulate API call
     const mockSuggestions: AIPatchSuggestion[] = scan.aiScanResult.vulnerabilities.map(v => ({
         vulnerabilityType: v.type,
+        vulnerabilityDescription: v.description, // Added this field to type
         affectedComponent: v.affectedUrl || v.affectedFile || "Unknown component",
-        suggestion: `// Placeholder fix for ${v.type}\nconsole.log("Apply security patch for ${v.description.substring(0,30)}...");`,
-        explanation: `This is a mock patch. For ${v.type}, ensure proper input validation and output encoding. The vulnerability was found at ${v.affectedUrl || v.affectedFile || 'N/A'}. Severity: ${v.severity}.`
+        suggestedCodePatch: `// Mock fix for ${v.type}\nconsole.log("Secure this: ${v.description.substring(0,30)}...");`,
+        explanation: `This is a mock patch explanation for ${v.type} at ${v.affectedUrl || v.affectedFile || 'N/A'}. Severity: ${v.severity}. Ensure all inputs are validated and outputs encoded.`,
+        language: 'javascript' // Assuming JS for mock
     }));
     setPatchSuggestions(mockSuggestions);
     setIsLoadingPatches(false);
@@ -154,9 +175,9 @@ export default function ScanDetailPage() {
         toast({title: "No Patches", description: "No patch suggestions to download.", variant: "default"});
         return;
     }
-    const dataStr = format === "json" 
+    const dataStr = format === "json"
         ? JSON.stringify(patchSuggestions, null, 2)
-        : patchSuggestions.map(p => `Vulnerability: ${p.vulnerabilityType}\nAffected: ${p.affectedComponent}\nSuggestion:\n${p.suggestion}\nExplanation:\n${p.explanation}\n\n---\n\n`).join('');
+        : patchSuggestions.map(p => `Vulnerability: ${p.vulnerabilityType}\nAffected: ${p.affectedComponent}\nSuggestion:\n${p.suggestedCodePatch}\nExplanation:\n${p.explanation}\n\n---\n\n`).join('');
     
     const dataUri = `data:text/${format};charset=utf-8,${encodeURIComponent(dataStr)}`;
     const downloadLink = document.createElement('a');
@@ -168,7 +189,6 @@ export default function ScanDetailPage() {
     toast({title: "Patches Downloaded", description: `Patch suggestions downloaded as ${format}.`});
   };
 
-
   if (loading) {
     return (
       <div className="space-y-6">
@@ -177,7 +197,7 @@ export default function ScanDetailPage() {
         </Button>
         <div className="flex items-center justify-center h-64">
           <Loader2 className="h-12 w-12 animate-spin text-primary" />
-          <p className="ml-4 text-lg text-muted-foreground">Loading scan details...</p>
+          <p className="ml-4 text-lg text-muted-foreground">Loading scan details for {scanId}...</p>
         </div>
       </div>
     );
@@ -188,7 +208,7 @@ export default function ScanDetailPage() {
       <div className="text-center py-10">
         <AlertCircle className="mx-auto h-12 w-12 text-destructive mb-4" />
         <h2 className="text-2xl font-semibold mb-2">Scan Not Found</h2>
-        <p className="text-muted-foreground mb-6">The requested scan could not be loaded or does not exist.</p>
+        <p className="text-muted-foreground mb-6">The scan (ID: {scanId}) could not be loaded or does not exist.</p>
         <Button onClick={() => router.push('/dashboard/scans')}>Go to Scan History</Button>
       </div>
     );
@@ -207,6 +227,9 @@ export default function ScanDetailPage() {
                 <h1 className="text-3xl font-bold tracking-tight font-headline truncate" title={scan.targetUrl}>{scan.targetUrl}</h1>
                 <p className="text-sm text-muted-foreground">
                     Scanned on: {scan.createdAt ? format(scan.createdAt.toDate(), "MMM dd, yyyy 'at' hh:mm a") : 'N/A'}
+                    {scan.updatedAt && scan.createdAt.seconds !== scan.updatedAt.seconds && (
+                       ` (Updated: ${format(scan.updatedAt.toDate(), "hh:mm a")})`
+                    )}
                 </p>
             </div>
             <Badge variant={getStatusBadgeVariant(scan.status)} className="text-base px-4 py-2 capitalize flex items-center gap-2">
@@ -227,7 +250,23 @@ export default function ScanDetailPage() {
         </Card>
       )}
 
-      {scan.aiScanResult && (
+      {(scan.status === "scanning" || scan.status === "queued") && !scan.aiScanResult && (
+        <Card className="shadow-lg">
+            <CardHeader>
+                <CardTitle className="text-xl font-headline flex items-center">
+                    <Loader2 className="w-6 h-6 mr-2 text-primary animate-spin" /> Scan in Progress...
+                </CardTitle>
+                <CardDescription>The scan for {scan.targetUrl} is currently {scan.status.replace('_',' ')}. Results will appear here once completed.</CardDescription>
+            </CardHeader>
+            <CardContent className="text-center py-8">
+                <Loader2 className="mx-auto h-12 w-12 animate-spin text-primary mb-4" />
+                <p className="text-lg font-medium">Please wait...</p>
+                <p className="text-muted-foreground">You can navigate away; the scan will continue in the background.</p>
+            </CardContent>
+        </Card>
+      )}
+
+      {scan.aiScanResult && (scan.status === "completed" || scan.status === "generating_report") && (
         <Card className="shadow-lg">
           <CardHeader>
             <CardTitle className="text-xl font-headline flex items-center">
@@ -248,18 +287,11 @@ export default function ScanDetailPage() {
                 <p className="text-lg font-medium">No vulnerabilities found!</p>
                 <p className="text-muted-foreground">This scan did not detect any vulnerabilities.</p>
               </div>
-            ) : (
-                 <div className="text-center py-8">
-                    <Loader2 className="mx-auto h-12 w-12 animate-spin text-primary mb-4" />
-                    <p className="text-lg font-medium">Scan in progress or status unclear...</p>
-                    <p className="text-muted-foreground">Vulnerability details will appear here once available.</p>
-                </div>
-            )}
+            ) : null }
           </CardContent>
         </Card>
       )}
 
-      {/* AI Patch Suggestion Engine Placeholder */}
       {scan.status === 'completed' && vulnerabilities.length > 0 && (
         <Card className="shadow-lg">
           <CardHeader className="flex flex-row justify-between items-center">
@@ -281,17 +313,19 @@ export default function ScanDetailPage() {
               <Accordion type="multiple" className="w-full space-y-2">
                 {patchSuggestions.map((patch, index) => (
                   <AccordionItem value={`patch-${index}`} key={index} className="bg-muted/50 rounded-md">
-                    <AccordionTrigger className="px-4 text-left">
+                    <AccordionTrigger className="px-4 text-left hover:no-underline">
                         <div className="flex items-center gap-2">
                             <Code className="w-5 h-5 text-primary"/>
                             <span>Fix for: {patch.vulnerabilityType} at {patch.affectedComponent.substring(0,50)}{patch.affectedComponent.length > 50 ? '...' : ''}</span>
                         </div>
                     </AccordionTrigger>
-                    <AccordionContent className="px-4 space-y-2">
+                    <AccordionContent className="px-4 pt-2 pb-4 space-y-2">
                       <h4 className="font-semibold mt-2">Explanation:</h4>
                       <p className="text-sm text-muted-foreground whitespace-pre-line">{patch.explanation}</p>
-                      <h4 className="font-semibold mt-2">Suggested Code:</h4>
-                      <pre className="bg-background p-3 rounded-md text-xs overflow-x-auto"><code>{patch.suggestion}</code></pre>
+                      <h4 className="font-semibold mt-2">Suggested Code ({patch.language || 'generic'}):</h4>
+                      <ScrollArea className="max-h-60 w-full">
+                        <pre className="bg-background p-3 rounded-md text-xs overflow-x-auto"><code>{patch.suggestedCodePatch}</code></pre>
+                      </ScrollArea>
                     </AccordionContent>
                   </AccordionItem>
                 ))}
@@ -299,7 +333,7 @@ export default function ScanDetailPage() {
             </CardContent>
           )}
            {patchSuggestions.length > 0 && (
-            <CardFooter className="gap-2">
+            <CardFooter className="gap-2 border-t pt-4 mt-4">
                  <Button variant="outline" onClick={() => handleDownloadPatches("json")}>
                     <Download className="mr-2 h-4 w-4" /> Download as JSON
                 </Button>
@@ -312,11 +346,11 @@ export default function ScanDetailPage() {
       )}
 
 
-      <ReportDisplay 
+      <ReportDisplay
         scanId={scan.id}
-        reportData={scan.aiSecurityReport} 
+        reportData={scan.aiSecurityReport}
         isLoading={isGeneratingReport}
-        onGenerateReport={scan.status === 'completed' && scan.aiScanResult && !scan.aiSecurityReport && !scan.id.startsWith("mock") ? handleGenerateReport : undefined}
+        onGenerateReport={scan.status === 'completed' && scan.aiScanResult && !scan.aiSecurityReport && !scan.id.startsWith("mock-") ? handleGenerateReport : undefined}
         scanTargetUrl={scan.targetUrl}
         scanDate={scan.createdAt ? scan.createdAt.toDate() : new Date()}
         userDisplayName={user?.displayName || "User"}
