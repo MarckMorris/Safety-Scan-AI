@@ -1,17 +1,17 @@
 
 "use client";
 
-import { useEffect, useState } from "react";
-import { useParams, useRouter, useSearchParams } from "next/navigation"; // Added useSearchParams
+import { useEffect, useState, useMemo } from "react";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
-import { doc, onSnapshot, Timestamp } from "firebase/firestore";
+import { doc, onSnapshot, Timestamp, updateDoc, serverTimestamp } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import type { Scan, AISecurityReport, Vulnerability, AIPatchSuggestion } from "@/types";
 import VulnerabilityItem from "@/components/dashboard/VulnerabilityItem";
 import ReportDisplay from "@/components/dashboard/ReportDisplay";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, CheckCircle, AlertTriangle, Clock, Loader2, FileText, Download, Wand2, Code, AlertCircle, Info } from "lucide-react";
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle, AccordionItem, AccordionTrigger, AccordionContent } from "@/components/ui/card"; // Added Accordion types
 import { Accordion } from "@/components/ui/accordion";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
@@ -45,7 +45,7 @@ const getStatusIcon = (status?: Scan["status"]) => {
 
 export default function ScanDetailPage() {
   const params = useParams();
-  const searchParams = useSearchParams(); // To get query parameters
+  const searchParams = useSearchParams();
   const scanId = params.scanId as string;
   const { user } = useAuth();
   const router = useRouter();
@@ -56,30 +56,31 @@ export default function ScanDetailPage() {
   const [isGeneratingReport, setIsGeneratingReport] = useState(false);
   const [patchSuggestions, setPatchSuggestions] = useState<AIPatchSuggestion[]>([]);
   const [isLoadingPatches, setIsLoadingPatches] = useState(false);
-  const [initialTargetUrl, setInitialTargetUrl] = useState<string | null>(null);
+  
+  const initialTargetUrl = useMemo(() => {
+    const urlFromQuery = searchParams.get("targetUrl");
+    return urlFromQuery ? decodeURIComponent(urlFromQuery) : null;
+  }, [searchParams]);
+
+  const toastTimeouts = useMemo(() => new Map<string, NodeJS.Timeout>(), []);
 
 
   useEffect(() => {
-    // Get targetUrl from query param for initial display if scan data isn't loaded yet
-    const urlFromQuery = searchParams.get("targetUrl");
-    if (urlFromQuery) {
-      setInitialTargetUrl(decodeURIComponent(urlFromQuery));
-    }
-
     if (!user || !scanId) {
         setLoading(false);
         const mockScan = mockScansData.find(s => s.id === scanId);
         if (mockScan) {
             setScan(mockScan);
-            toast({ title: "Displaying Mock Scan", description: "User or Scan ID invalid, showing mock data.", variant: "default" });
+            // Consider if toast is needed here, could contribute to issues if rapidly changing
+            // toast({ title: "Displaying Mock Scan", description: "User or Scan ID invalid, showing mock data.", variant: "default" });
         } else {
-            toast({ title: "Error", description: "User or Scan ID missing. Cannot load scan.", variant: "destructive" });
+            // toast({ title: "Error", description: "User or Scan ID missing. Cannot load scan.", variant: "destructive" });
             router.push("/dashboard/scans");
         }
         return;
     }
 
-    setLoading(true);
+    setLoading(true); // Set loading true at the beginning of data fetching
     const scanDocRef = doc(db, "users", user.uid, "scans", scanId);
 
     const unsubscribe = onSnapshot(scanDocRef, (docSnap) => {
@@ -88,29 +89,25 @@ export default function ScanDetailPage() {
         setScan(scanData);
         if (scanData.status === "failed" && scanData.errorMessage && !toastTimeouts.has(`fail-${scanId}`)) {
             toast({ title: `Scan Failed: ${scanData.targetUrl}`, description: scanData.errorMessage, variant: "destructive" });
-            toastTimeouts.set(`fail-${scanId}`, setTimeout(() => toastTimeouts.delete(`fail-${scanId}`), 5000)); // Prevent re-toast
+            toastTimeouts.set(`fail-${scanId}`, setTimeout(() => toastTimeouts.delete(`fail-${scanId}`), 5000));
         }
         setLoading(false);
       } else {
-        // Document doesn't exist yet, or was deleted.
-        // Keep loading true for a short period to allow for Firestore replication / initial write.
-        // If it's still not there after a timeout, then show "not found" or fallback.
         console.log(`Scan document ${scanId} not found initially. Waiting briefly...`);
-        // If initialTargetUrl is set (from query param), we can show a "queued" like state.
-        if (!scan && initialTargetUrl) { // Only set temporary scan if `scan` is still null
+        if (!scan && initialTargetUrl) {
             setScan({
                 id: scanId,
                 userId: user.uid,
                 targetUrl: initialTargetUrl,
-                status: 'queued', // Or 'scanning' if processScanInBackground sets it to scanning first
-                createdAt: Timestamp.now(), // Placeholder
-                updatedAt: Timestamp.now(), // Placeholder
+                status: 'queued',
+                createdAt: Timestamp.now(),
+                updatedAt: Timestamp.now(),
                 aiScanResult: null,
                 aiSecurityReport: null,
             });
+            // Still loading as we expect the real doc or timeout
         }
-        // Don't immediately set loading to false here if we expect it to appear.
-        // setLoading(false); // Let a timeout handle this if it never appears
+        // Don't set loading false immediately if we expect it to appear or timeout
       }
     }, (error) => {
       console.error("Error fetching scan details with onSnapshot:", error);
@@ -122,28 +119,31 @@ export default function ScanDetailPage() {
       setLoading(false);
     });
 
-    // Handle case where document might never appear (e.g., if setDoc failed silently in ScanForm)
     const timer = setTimeout(() => {
-        if (loading && !scan) { // If still loading and no scan data received
+        // Check if scan is still null *and* loading is still true (meaning onSnapshot hasn't resolved or errored yet)
+        if (loading && !scan) { 
             setLoading(false);
-            toast({ title: "Scan Not Found", description: "The scan data could not be loaded. Please try again or check history.", variant: "destructive" });
+            toast({ title: "Scan Not Found", description: "The scan data could not be loaded after a timeout. Please try again or check history.", variant: "destructive" });
             const mockScan = mockScansData.find(s => s.id === scanId);
             if (mockScan) {
                 setScan(mockScan);
-                toast({ title: "Displaying Mock Scan", description: "Real scan not found, showing mock data.", variant: "default" });
+                // toast({ title: "Displaying Mock Scan", description: "Real scan not found after timeout, showing mock data.", variant: "default" });
             } else {
                  router.push("/dashboard/scans");
             }
         }
-    }, 7000); // Wait 7 seconds for the document to appear
+    }, 7000);
 
     return () => {
         unsubscribe();
         clearTimeout(timer);
+        toastTimeouts.forEach(clearTimeout); // Clear any pending toast timeouts
+        toastTimeouts.clear();
     };
-  }, [user, scanId, router, toast, searchParams, initialTargetUrl, loading, scan]); // Added loading and scan to dependencies for the timer logic
-
-  const toastTimeouts = new Map<string, NodeJS.Timeout>(); // To prevent re-toasting errors
+  // IMPORTANT: Removed 'loading' and 'scan' from dependencies.
+  // 'initialTargetUrl' is memoized. 'toast' and 'router' are stable.
+  // 'toastTimeouts' is memoized.
+  }, [user, scanId, router, toast, initialTargetUrl, toastTimeouts]);
 
 
   const handleGenerateReport = async () => {
@@ -151,26 +151,29 @@ export default function ScanDetailPage() {
       toast({ title: "Cannot Generate Report", description: "Scan data incomplete, user not found, scan is mock, or scan not completed.", variant: "destructive" });
       return;
     }
-    if (!scan.id) { // Ensure scan.id is valid
+    if (!scan.id) {
         toast({ title: "Scan ID Missing", description: "Cannot generate report without a valid scan ID.", variant: "destructive"});
         return;
     }
-
 
     setIsGeneratingReport(true);
     const scanDocRef = doc(db, "users", user.uid, "scans", scan.id);
     
     try {
+      // Optimistically update local state first, then Firestore
       setScan(prev => prev ? {...prev, status: "generating_report"} : null);
       await updateDoc(scanDocRef, { status: "generating_report", updatedAt: serverTimestamp() });
 
-      const aiReport: AISecurityReport = await generateSecurityImprovementReport({
+      const aiReportOutput = await generateSecurityImprovementReport({ // Renamed to avoid conflict with AISecurityReport type
         scanResults: JSON.stringify(scan.aiScanResult),
       });
+      
+      const newReport: AISecurityReport = { report: aiReportOutput.report };
 
-      setScan(prev => prev ? {...prev, aiSecurityReport: aiReport, status: "completed", updatedAt: Timestamp.now()} : null);
+      // Optimistically update local state, then Firestore
+      setScan(prev => prev ? {...prev, aiSecurityReport: newReport, status: "completed", updatedAt: Timestamp.now()} : null);
       await updateDoc(scanDocRef, {
-        aiSecurityReport: aiReport,
+        aiSecurityReport: newReport,
         status: "completed",
         updatedAt: serverTimestamp(),
       });
@@ -179,8 +182,10 @@ export default function ScanDetailPage() {
     } catch (error: any) {
       console.error("Error generating report:", error);
       toast({ title: "Report Generation Failed", description: error.message || "Could not generate report.", variant: "destructive" });
-      setScan(prev => prev ? {...prev, status: "completed"} : null);
-      await updateDoc(scanDocRef, { status: "completed", updatedAt: serverTimestamp() });
+      // Revert local state if Firestore update fails or was optimistic
+      setScan(prev => prev ? {...prev, status: "completed"} : null); // Revert to completed, report might not be there
+      // Attempt to update Firestore status back to completed if it was changed to generating_report
+      await updateDoc(scanDocRef, { status: "completed", updatedAt: serverTimestamp() }).catch(err => console.error("Failed to revert status to completed", err));
     } finally {
       setIsGeneratingReport(false);
     }
@@ -225,7 +230,7 @@ export default function ScanDetailPage() {
     toast({title: "Patches Downloaded", description: `Patch suggestions downloaded as ${formatType}.`});
   };
 
-  if (loading && !scan) { // Show detailed loading only if scan is not even partially set (e.g. from query param)
+  if (loading && !scan) {
     return (
       <div className="space-y-6">
         <Button variant="outline" onClick={() => router.back()} className="mb-4">
@@ -239,7 +244,7 @@ export default function ScanDetailPage() {
     );
   }
 
-  if (!scan) { // Should be covered by timeout logic, but as a fallback
+  if (!scan && !loading) { // If loading is false and scan is still null
     return (
       <div className="text-center py-10">
         <AlertCircle className="mx-auto h-12 w-12 text-destructive mb-4" />
@@ -250,8 +255,8 @@ export default function ScanDetailPage() {
     );
   }
   
-  const currentTargetUrl = scan.targetUrl || initialTargetUrl;
-  const vulnerabilities = scan.aiScanResult?.vulnerabilities || [];
+  const currentTargetUrl = scan?.targetUrl || initialTargetUrl;
+  const vulnerabilities = scan?.aiScanResult?.vulnerabilities || [];
 
   return (
     <div className="space-y-8">
@@ -263,20 +268,20 @@ export default function ScanDetailPage() {
             <div>
                 <h1 className="text-3xl font-bold tracking-tight font-headline truncate" title={currentTargetUrl || "Loading URL..."}>{currentTargetUrl || "Loading URL..."}</h1>
                 <p className="text-sm text-muted-foreground">
-                    Queued/Scanned on: {scan.createdAt ? format(scan.createdAt.toDate(), "MMM dd, yyyy 'at' hh:mm a") : 'N/A'}
-                    {scan.updatedAt && scan.createdAt?.seconds !== scan.updatedAt?.seconds && (
+                    Queued/Scanned on: {scan?.createdAt ? format(scan.createdAt.toDate(), "MMM dd, yyyy 'at' hh:mm a") : 'N/A'}
+                    {scan?.updatedAt && scan?.createdAt?.seconds !== scan?.updatedAt?.seconds && (
                        ` (Updated: ${format(scan.updatedAt.toDate(), "hh:mm a")})`
                     )}
                 </p>
             </div>
-            <Badge variant={getStatusBadgeVariant(scan.status)} className="text-base px-4 py-2 capitalize flex items-center gap-2">
-                {getStatusIcon(scan.status)}
-                {scan.status?.replace('_', ' ') || 'Loading...'}
+            <Badge variant={getStatusBadgeVariant(scan?.status)} className="text-base px-4 py-2 capitalize flex items-center gap-2">
+                {getStatusIcon(scan?.status)}
+                {scan?.status?.replace('_', ' ') || 'Loading...'}
             </Badge>
         </div>
       </div>
       
-      {scan.status === "failed" && (
+      {scan?.status === "failed" && (
         <Card className="border-destructive bg-destructive/10">
             <CardHeader>
                 <CardTitle className="text-destructive flex items-center gap-2"><AlertTriangle/>Scan Failed</CardTitle>
@@ -287,12 +292,12 @@ export default function ScanDetailPage() {
         </Card>
       )}
 
-      {(scan.status === "scanning" || scan.status === "queued" || (loading && scan.status !== 'completed' && scan.status !== 'failed')) && !scan.aiScanResult && (
+      {(scan?.status === "scanning" || scan?.status === "queued" || (loading && scan?.status !== 'completed' && scan?.status !== 'failed')) && !scan?.aiScanResult && (
         <Card className="shadow-lg">
             <CardHeader>
                 <CardTitle className="text-xl font-headline flex items-center">
                     <Loader2 className="w-6 h-6 mr-2 text-primary animate-spin" /> 
-                    Scan for {currentTargetUrl || "target"} is {scan.status?.replace('_',' ') || "being prepared"}...
+                    Scan for {currentTargetUrl || "target"} is {scan?.status?.replace('_',' ') || "being prepared"}...
                 </CardTitle>
                 <CardDescription>Results will appear here once available. This page updates automatically.</CardDescription>
             </CardHeader>
@@ -304,7 +309,7 @@ export default function ScanDetailPage() {
         </Card>
       )}
 
-      {scan.aiScanResult && (scan.status === "completed" || scan.status === "generating_report") && (
+      {scan?.aiScanResult && (scan?.status === "completed" || scan?.status === "generating_report") && (
         <Card className="shadow-lg">
           <CardHeader>
             <CardTitle className="text-xl font-headline flex items-center">
@@ -316,10 +321,10 @@ export default function ScanDetailPage() {
             {vulnerabilities.length > 0 ? (
               <Accordion type="single" collapsible className="w-full">
                 {vulnerabilities.map((vuln, index) => (
-                  <VulnerabilityItem key={`${scan.id}-vuln-${index}`} vulnerability={vuln} index={index}/>
+                  <VulnerabilityItem key={`${scan?.id}-vuln-${index}`} vulnerability={vuln} index={index}/>
                 ))}
               </Accordion>
-            ) : scan.status === 'completed' ? (
+            ) : scan?.status === 'completed' ? (
               <div className="text-center py-8">
                 <CheckCircle className="mx-auto h-12 w-12 text-green-500 mb-4" />
                 <p className="text-lg font-medium">No vulnerabilities found!</p>
@@ -330,7 +335,7 @@ export default function ScanDetailPage() {
         </Card>
       )}
 
-      {scan.status === 'completed' && vulnerabilities.length > 0 && (
+      {scan?.status === 'completed' && vulnerabilities.length > 0 && (
         <Card className="shadow-lg">
           <CardHeader className="flex flex-row justify-between items-center">
             <div>
@@ -350,7 +355,7 @@ export default function ScanDetailPage() {
             <CardContent>
               <Accordion type="multiple" className="w-full space-y-2">
                 {patchSuggestions.map((patch, index) => (
-                  <AccordionItem value={`patch-${index}`} key={`${scan.id}-patch-${index}`} className="bg-muted/50 rounded-md">
+                  <AccordionItem value={`patch-${index}`} key={`${scan?.id}-patch-${index}`} className="bg-muted/50 rounded-md">
                     <AccordionTrigger className="px-4 text-left hover:no-underline">
                         <div className="flex items-center gap-2">
                             <Code className="w-5 h-5 text-primary"/>
@@ -391,15 +396,15 @@ export default function ScanDetailPage() {
 
 
       <ReportDisplay
-        scanId={scan.id}
-        reportData={scan.aiSecurityReport}
+        scanId={scan?.id}
+        reportData={scan?.aiSecurityReport}
         isLoading={isGeneratingReport}
-        onGenerateReport={scan.status === 'completed' && scan.aiScanResult && !scan.aiSecurityReport && !scan.id.startsWith("mock-") ? handleGenerateReport : undefined}
+        onGenerateReport={scan?.status === 'completed' && scan?.aiScanResult && !scan?.aiSecurityReport && !scan?.id.startsWith("mock-") ? handleGenerateReport : undefined}
         scanTargetUrl={currentTargetUrl || undefined}
-        scanDate={scan.createdAt ? scan.createdAt.toDate() : new Date()}
+        scanDate={scan?.createdAt ? scan.createdAt.toDate() : new Date()}
         userDisplayName={user?.displayName || "User"}
       />
-      {scan.id.startsWith("mock-") && (
+      {scan?.id.startsWith("mock-") && (
          <Card className="border-amber-500 bg-amber-50 mt-4">
             <CardContent className="p-4">
               <div className="flex items-center gap-2">
@@ -414,3 +419,4 @@ export default function ScanDetailPage() {
     </div>
   );
 }
+
