@@ -46,6 +46,7 @@ Please take the following steps:
    Next.js development server (Ctrl+C in the terminal, then 'npm run dev').
 
 Firebase cannot connect without the correct configuration.
+The application will now halt.
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!`;
   console.error(errorMessage);
   throw new Error(`Firebase configuration error: Missing or placeholder values for ${missingOrInvalidKeys.join(', ')}. Check server logs and .env.local.`);
@@ -116,7 +117,6 @@ const mockAuth = {
   },
   signOut: async (authInstance: any): Promise<void> => {
     console.warn('Mock signOut called from firebase.ts instance');
-    // In a real scenario, this would also update currentUser to null
     if (mockAuth.currentUser) {
         // mockAuth.currentUser = null; // This line might cause issues if not handled carefully with React state
         console.warn("Simulated mockAuth.currentUser to null. App state managed by AuthContext.");
@@ -124,7 +124,6 @@ const mockAuth = {
     return Promise.resolve();
   },
   currentUser: mockUserForFirebaseAuth, // Set currentUser to the mock user
-  // Add other methods that might be called on 'auth' directly if needed
   updateProfile: async (user: User, profile: { displayName?: string | null, photoURL?: string | null }) => {
     console.warn('Mock auth.updateProfile called for user:', user.uid, 'with profile:', profile);
     if (mockAuth.currentUser && mockAuth.currentUser.uid === user.uid) {
@@ -149,11 +148,21 @@ let storage: FirebaseStorage;
 
 try {
   db = getFirestore(app);
-  storage = getStorage(app);
+  console.log("Firestore service initialized successfully.");
 } catch (e: any) {
-    console.error("Error getting Firestore/Storage services after app initialization:", e.message);
-    db = {} as Firestore; 
-    storage = {} as FirebaseStorage;
+    const errorMsg = `CRITICAL: Failed to initialize Firestore service: ${e.message}. This usually means your Firebase project configuration (especially 'NEXT_PUBLIC_FIREBASE_PROJECT_ID' in .env.local) is incorrect or the project doesn't exist. The application will halt.`;
+    console.error(errorMsg, e);
+    throw new Error(errorMsg); // Make it a hard stop
+}
+
+try {
+  storage = getStorage(app);
+  console.log("Firebase Storage service initialized successfully.");
+} catch (e: any)
+ {
+    const errorMsg = `CRITICAL: Failed to initialize Firebase Storage service: ${e.message}. Check Firebase project setup (especially 'NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET'). The application will halt.`;
+    console.error(errorMsg, e);
+    throw new Error(errorMsg); // Make it a hard stop
 }
 
 export { app, auth, db, storage };
