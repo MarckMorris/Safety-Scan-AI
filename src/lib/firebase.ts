@@ -1,8 +1,9 @@
 
 import { initializeApp, getApps, FirebaseApp } from 'firebase/app';
-import { getAuth, Auth } from 'firebase/auth'; // Re-enabled real Auth import
+import { getAuth, Auth } from 'firebase/auth';
 import { getFirestore, Firestore } from 'firebase/firestore';
 import { getStorage, FirebaseStorage } from 'firebase/storage';
+import { initializeAppCheck, ReCaptchaV3Provider } from 'firebase/app-check'; // New import
 
 const firebaseConfigValues = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
@@ -63,6 +64,38 @@ if (!getApps().length) {
 } else {
   app = getApps()[0];
 }
+
+// Initialize App Check
+// IMPORTANT: For this to work, you MUST:
+// 1. Set up reCAPTCHA v3 for your domain in the Google Cloud Console (reCAPTCHA Admin) and get a SITE KEY.
+// 2. Add this SITE KEY to your .env.local file as:
+//    NEXT_PUBLIC_RECAPTCHA_V3_SITE_KEY=your_actual_recaptcha_v3_site_key_here
+// 3. In the Firebase Console -> App Check -> Apps: Register your web app if not already.
+//    Then, select "reCAPTCHA v3" as the provider and enter your Site Key and Secret Key.
+// 4. In the Firebase Console -> App Check -> Services (e.g., Authentication, Firestore): Click "Enforce" for relevant services.
+//
+// The error "authInstance._getRecaptchaConfig is not a function" typically means App Check IS enforced for Authentication
+// in the Firebase console, but client-side App Check initialization (below) is missing or failed.
+if (typeof window !== "undefined") { // App Check only runs in the browser environment
+  const recaptchaSiteKey = process.env.NEXT_PUBLIC_RECAPTCHA_V3_SITE_KEY;
+  if (recaptchaSiteKey && recaptchaSiteKey !== "your_actual_recaptcha_v3_site_key_here" && recaptchaSiteKey.trim() !== "") {
+    try {
+      // Pass `app` to initializeAppCheck
+      initializeAppCheck(app, { // Make sure `app` is the FirebaseApp instance
+        provider: new ReCaptchaV3Provider(recaptchaSiteKey),
+        isTokenAutoRefreshEnabled: true,
+      });
+      console.log("Firebase App Check initialized successfully with reCAPTCHA v3.");
+    } catch (e: any) {
+      console.error("Firebase App Check initialization FAILED:", e.message);
+      // Depending on your app's needs, you might treat this as a critical error or allow the app to continue.
+      // If App Check is strictly enforced for Auth, failures here will likely lead to auth errors.
+    }
+  } else {
+    console.warn("Firebase App Check with reCAPTCHA v3 not initialized: NEXT_PUBLIC_RECAPTCHA_V3_SITE_KEY is not set or is a placeholder in .env.local. If App Check is enforced in Firebase console for services like Authentication, you WILL encounter errors.");
+  }
+}
+
 
 let auth: Auth;
 let db: Firestore;
