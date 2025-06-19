@@ -47,12 +47,12 @@ export default function ScanDetailPage() {
   const params = useParams();
   const searchParams = useSearchParams();
   const scanId = params.scanId as string;
-  const { user, loading: authLoading } = useAuth(); // Get authLoading state
+  const { user, loading: authLoading } = useAuth();
   const router = useRouter();
   const { toast } = useToast();
 
   const [scan, setScan] = useState<Scan | null>(null);
-  const [loading, setLoading] = useState(true); // Manages loading of scan data
+  const [loading, setLoading] = useState(true);
   const [isGeneratingReport, setIsGeneratingReport] = useState(false);
   const [patchSuggestions, setPatchSuggestions] = useState<AIPatchSuggestion[]>([]);
   const [isLoadingPatches, setIsLoadingPatches] = useState(false);
@@ -64,19 +64,42 @@ export default function ScanDetailPage() {
 
 
   useEffect(() => {
-    // Wait for auth to finish loading and for user and scanId to be available
-    if (authLoading || !user?.uid || !scanId) {
-      console.log(`[ScanDetailPage] useEffect waiting for auth/user/scanId. AuthLoading: ${authLoading}, User: ${!!user?.uid}, ScanId: ${scanId}`);
-      if (scanId && !authLoading && !user?.uid) { // User explicitly not available after auth check
-          toast({ title: "Authentication Issue", description: "Cannot load scan details without user authentication.", variant: "destructive" });
-          router.push("/auth/login");
-      }
-      // If scanId is present but user context is still loading, keep `loading` true.
-      // If scanId is missing, this effect will re-run when it becomes available.
-      if (!scan && initialTargetUrl) { // Show temporary "queued" state if navigating from ScanForm
+    let unsubscribe = () => {};
+    let timedOut = false; // Flag to prevent updates after timeout
+    let timerId: NodeJS.Timeout;
+
+    console.log(`[ScanDetailPage] useEffect triggered. authLoading: ${authLoading}, user?.uid: ${user?.uid}, scanId: ${scanId}`);
+
+    if (authLoading) {
+      console.log("[ScanDetailPage] Auth is loading, waiting...");
+      setLoading(true); // Ensure loading is true while auth is resolving
+      return;
+    }
+
+    if (!user?.uid) {
+      console.error("[ScanDetailPage] User not authenticated after auth check. Redirecting to login.");
+      toast({ title: "Authentication Required", description: "You must be logged in to view scan details.", variant: "destructive" });
+      router.push("/auth/login");
+      setLoading(false);
+      return;
+    }
+
+    if (!scanId) {
+      console.log("[ScanDetailPage] scanId is not yet available. Waiting.");
+      setLoading(true); // Keep loading if scanId isn't available
+      return; // scanId might not be available on first render
+    }
+    
+    // At this point, auth is done, user is available, and scanId is available.
+    console.log(`[ScanDetailPage] Setting up Firestore listener for user: ${user.uid}, scan: ${scanId}`);
+    setLoading(true); // Explicitly set loading when we start fetching
+
+    // If we have an initialTargetUrl and no scan data yet, create a placeholder
+    if (initialTargetUrl && !scan) {
+        console.log(`[ScanDetailPage] Using initialTargetUrl '${initialTargetUrl}' to create placeholder scan object.`);
         setScan({
             id: scanId,
-            userId: "temp-user", // Placeholder, will be overwritten
+            userId: user.uid,
             targetUrl: initialTargetUrl,
             status: 'queued', 
             createdAt: Timestamp.now(), 
@@ -84,73 +107,69 @@ export default function ScanDetailPage() {
             aiScanResult: null,
             aiSecurityReport: null,
         });
-        setLoading(false); // We have enough to show a placeholder
-      } else if (!initialTargetUrl) {
-        setLoading(true); // No initial URL, truly waiting for Firestore
-      }
-      return; // Early exit if not ready
     }
 
-    console.log(`[ScanDetailPage] useEffect running with User: ${user.uid}, ScanId: ${scanId}`);
-    setLoading(true); // Explicitly set loading to true when starting to fetch
     const scanDocRef = doc(db, "users", user.uid, "scans", scanId);
-    let timedOut = false;
-
-    const unsubscribe = onSnapshot(scanDocRef, (docSnap) => {
-      console.log(`[ScanDetailPage] onSnapshot fired for ${scanId}. Exists: ${docSnap.exists()}`);
+    
+    unsubscribe = onSnapshot(scanDocRef, (docSnap) => {
       if (timedOut) {
           console.log(`[ScanDetailPage] onSnapshot received data for ${scanId} but after timeout. Ignoring.`);
           return;
       }
+      console.log(`[ScanDetailPage] onSnapshot fired for ${scanId}. Exists: ${docSnap.exists()}`);
       if (docSnap.exists()) {
           const scanData = { id: docSnap.id, ...docSnap.data() } as Scan;
           console.log(`[ScanDetailPage] Scan data received for ${scanId}:`, scanData);
           setScan(scanData);
-          if (scanData.status === "failed" && scanData.errorMessage) {
+          if (scanData.status === "failed" && scanData.errorMessage && scan?.status !== "failed") { // Only toast failure once
               toast({ title: `Scan Failed: ${scanData.targetUrl}`, description: scanData.errorMessage, variant: "destructive" });
           }
           setLoading(false);
       } else {
-          console.log(`[ScanDetailPage] Scan document ${scanId} does NOT exist yet in Firestore for user ${user.uid}. Waiting or timeout will occur.`);
+          console.log(`[ScanDetailPage] Scan document ${scanId} does NOT exist (yet?) in Firestore for user ${user.uid}. Waiting for it or timeout.`);
           // Don't set scan to null here if it already has the initialTargetUrl placeholder
-          if (!initialTargetUrl) {
-            setScan(null); // No placeholder and doc doesn't exist
+          if (!initialTargetUrl) { // if there's no placeholder, it means we are truly waiting
+            // setScan(null); // This might clear the placeholder too early if the doc just hasn't been created yet
           }
-          // setLoading(false) will be handled by timeout if it never appears
+          // setLoading(false) will be handled by timeout if it never appears, or by a successful read
       }
     }, (error) => {
+      if (timedOut) {
+        console.log(`[ScanDetailPage] onSnapshot error for ${scanId} but after timeout. Ignoring.`);
+        return;
+      }
       console.error(`[ScanDetailPage] Error in onSnapshot for ${scanId}:`, error);
-      if (timedOut) return;
-      toast({ title: "Error Fetching Scan", description: "Could not fetch scan details. Trying mock data.", variant: "destructive" });
-      const mockScan = mockScansData.find(s => s.id === scanId); // Fallback for demo if needed
-      if (mockScan) setScan(mockScan); else setScan(null);
+      toast({ title: "Error Fetching Scan", description: `Could not fetch scan details in real-time: ${error.message}. Mock data might be used if available.`, variant: "destructive" });
+      const mockScan = mockScansData.find(s => s.id === scanId); // Fallback for demo
+      if (mockScan) setScan(mockScan); else if (!initialTargetUrl) setScan(null); // Only set to null if no placeholder
       setLoading(false);
     });
 
-    const timerId = setTimeout(() => {
+    timerId = setTimeout(() => {
       timedOut = true; // Mark as timed out
-      if (loading && !scan) { // If still loading and no scan has been set by onSnapshot or placeholder
-        console.warn(`[ScanDetailPage] Timeout for ${scanId}. Scan data not loaded.`);
-        toast({ title: "Scan Not Found", description: `The scan data for ${initialTargetUrl || scanId} could not be loaded after a timeout. Please try again or check history.`, variant: "destructive" });
-        // Attempt to load mock if initialTargetUrl indicates it was a fresh scan.
-        // Or if it's an old scan ID, just say not found.
-        const mockScanIfRecent = initialTargetUrl ? mockScansData.find(s => s.id === scanId) : null;
-        if (mockScanIfRecent) {
-            setScan(mockScanIfRecent);
-        } else if (!scan) { // If scan is still null after timeout and no mock was found
-            router.push("/dashboard/scans"); // Redirect if truly not found
+      if (loading && !scan?.aiScanResult && scan?.status !== 'completed' && scan?.status !== 'failed' ) { // More specific condition for timeout toast
+        console.warn(`[ScanDetailPage] Timeout for ${scanId}. Scan data for ${displayTargetUrl || scanId} not loaded or scan not completed/failed.`);
+        toast({
+          title: "Scan Not Found or Incomplete",
+          description: `The scan data for ${displayTargetUrl || scanId} could not be fully loaded after a timeout. Please try again or check history. Status: ${scan?.status || 'unknown'}`,
+          variant: "destructive"
+        });
+        if (!scan) { // If scan is still completely null
+             // router.push("/dashboard/scans"); // Consider removing auto-redirect
         }
       }
-      setLoading(false); 
+      setLoading(false); // Ensure loading is set to false after timeout
     }, 10000); // 10 seconds timeout
 
     return () => {
-      console.log(`[ScanDetailPage] useEffect cleanup for ${scanId}. Unsubscribing from onSnapshot.`);
+      console.log(`[ScanDetailPage] useEffect cleanup for ${scanId}. Unsubscribing from onSnapshot and clearing timeout.`);
       unsubscribe();
       clearTimeout(timerId);
       timedOut = true; // Ensure onSnapshot doesn't act on stale listeners
     };
-  }, [scanId, user, authLoading, router, toast, initialTargetUrl]);
+  // Using user.uid directly which is a primitive and stable if user object itself is stable or memoized by context.
+  // initialTargetUrl is memoized. router and toast are generally stable.
+  }, [scanId, user?.uid, authLoading, initialTargetUrl]); // Refined dependencies
 
 
   const handleGenerateReport = async () => {
@@ -176,7 +195,7 @@ export default function ScanDetailPage() {
       
       const newReport: AISecurityReport = { report: aiReportOutput.report };
 
-      setScan(prev => prev ? {...prev, aiSecurityReport: newReport, status: "completed", updatedAt: Timestamp.now()} : null); // Optimistic UI update
+      setScan(prev => prev ? {...prev, aiSecurityReport: newReport, status: "completed", updatedAt: Timestamp.now()} : null);
       await updateDoc(scanDocRef, {
         aiSecurityReport: newReport,
         status: "completed",
@@ -190,7 +209,7 @@ export default function ScanDetailPage() {
       if (scan && scan.id && user) {
         try {
             await updateDoc(doc(db, "users", user.uid, "scans", scan.id), { status: "completed", updatedAt: serverTimestamp() });
-            setScan(prev => prev ? {...prev, status: "completed"} : null); // Revert status optimistically
+            setScan(prev => prev ? {...prev, status: "completed"} : null);
         } catch (revertError) {
              console.error("Failed to revert status to completed after report generation error", revertError);
         }
@@ -239,11 +258,10 @@ export default function ScanDetailPage() {
     toast({title: "Patches Downloaded", description: `Patch suggestions downloaded as ${formatType}.`});
   };
 
-  // Determine current target URL for display
   const displayTargetUrl = scan?.targetUrl || initialTargetUrl;
   const vulnerabilities = scan?.aiScanResult?.vulnerabilities || [];
 
-  if (loading && !scan) { // Initial loading state, before scan object (even temporary) is set or timeout
+  if (loading && !scan?.status) { 
     return (
       <div className="space-y-6">
         <Button variant="outline" onClick={() => router.back()} className="mb-4">
@@ -257,10 +275,13 @@ export default function ScanDetailPage() {
     );
   }
 
-  if (!scan && !loading) { // Scan is definitively null after loading attempts/timeout
+  if (!scan && !loading) { 
     return (
       <div className="text-center py-10">
-        <AlertCircle className="mx-auto h-12 w-12 text-destructive mb-4" />
+         <Button variant="outline" onClick={() => router.back()} className="mb-6 absolute top-4 left-4">
+          <ArrowLeft className="mr-2 h-4 w-4" /> Back
+        </Button>
+        <AlertCircle className="mx-auto h-12 w-12 text-destructive mb-4 mt-12" />
         <h2 className="text-2xl font-semibold mb-2">Scan Not Found</h2>
         <p className="text-muted-foreground mb-6">The scan (ID: {scanId}) could not be loaded or does not exist.</p>
         <Button onClick={() => router.push('/dashboard/scans')}>Go to Scan History</Button>
@@ -268,7 +289,6 @@ export default function ScanDetailPage() {
     );
   }
   
-  // If scan object exists (could be placeholder from initialTargetUrl or actual data)
   return (
     <div className="space-y-8">
       <div>
@@ -320,7 +340,7 @@ export default function ScanDetailPage() {
         </Card>
       )}
 
-      {scan?.aiScanResult && (scan?.status === "completed" || scan?.status === "generating_report" || (scan?.status === "failed" && scan.aiScanResult)) && ( // Show vulnerabilities even if generating report or if scan failed but somehow got results
+      {scan?.aiScanResult && (scan?.status === "completed" || scan?.status === "generating_report" || (scan?.status === "failed" && scan.aiScanResult)) && (
         <Card className="shadow-lg">
           <CardHeader>
             <CardTitle className="text-xl font-headline flex items-center">
@@ -416,11 +436,11 @@ export default function ScanDetailPage() {
         userDisplayName={user?.displayName || "User"}
       />
       {scan?.id.startsWith("mock-") && (
-         <Card className="border-amber-500 bg-amber-50 mt-4">
+         <Card className="border-amber-500 bg-amber-50 mt-4 dark:bg-amber-900/30">
             <CardContent className="p-4">
               <div className="flex items-center gap-2">
-                <Info className="h-5 w-5 text-amber-600" />
-                <p className="text-sm text-amber-700">
+                <Info className="h-5 w-5 text-amber-600 dark:text-amber-400" />
+                <p className="text-sm text-amber-700 dark:text-amber-300">
                   This is mock scan data for demonstration purposes. Features like report generation may be disabled.
                 </p>
               </div>
@@ -430,4 +450,3 @@ export default function ScanDetailPage() {
     </div>
   );
 }
-
