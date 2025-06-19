@@ -50,7 +50,7 @@ The application will now halt.
   console.error(errorMessage);
   throw new Error(`Firebase configuration error: Missing or placeholder values for ${missingOrInvalidKeys.join(', ')}. Check server logs and .env.local.`);
 } else {
-  console.log("[Firebase Setup] Firebase core config values check passed. Values:", firebaseConfigValues);
+  console.log("[Firebase Setup] Firebase core config values check passed.");
 }
 
 let app: FirebaseApp;
@@ -75,10 +75,9 @@ if (typeof window !== "undefined") {
   if (recaptchaSiteKey && recaptchaSiteKey.trim() !== "" && !recaptchaSiteKey.includes("your_actual_recaptcha_v3_site_key_here") && !recaptchaSiteKey.startsWith("PASTE") && !recaptchaSiteKey.startsWith("YOUR")) {
     console.log("[Firebase App Check] Valid reCAPTCHA v3 site key found. Attempting to initialize App Check...");
     try {
-      // Ensure that 'self.FIREBASE_APPCHECK_DEBUG_TOKEN = true;' is not set in production.
-      // It's for debugging App Check in non-localhost environments if you don't have reCAPTCHA setup yet.
-      // (self as any).FIREBASE_APPCHECK_DEBUG_TOKEN = process.env.NODE_ENV === 'development' ? true : undefined; // Example for debug token
-
+      // For debugging in non-localhost environments if reCAPTCHA isn't set up yet:
+      // (self as any).FIREBASE_APPCHECK_DEBUG_TOKEN = process.env.NODE_ENV === 'development' ? true : undefined;
+      
       appCheckInstance = initializeAppCheck(app, {
         provider: new ReCaptchaV3Provider(recaptchaSiteKey),
         isTokenAutoRefreshEnabled: true,
@@ -95,12 +94,13 @@ if (typeof window !== "undefined") {
         console.warn(`[Firebase App Check] App Check NOT initialized: NEXT_PUBLIC_RECAPTCHA_V3_SITE_KEY ('${recaptchaSiteKey}') appears to be a PLACEHOLDER value.`);
     }
     console.warn("[Firebase App Check] If App Check (e.g., for Authentication) is ENFORCED in your Firebase project console, auth operations WILL LIKELY FAIL with errors like 'authInstance._getRecaptchaConfig is not a function' or similar network errors.");
-    console.warn("[Firebase App Check] To fix: 1. Get a reCAPTCHA v3 Site Key. 2. Set NEXT_PUBLIC_RECAPTCHA_V3_SITE_KEY in .env.local. 3. Configure App Check in Firebase console with this key and ENFORCE for services.");
+    console.warn("[Firebase App Check] To fix: 1. Get a reCAPTCHA v3 Site Key from Google reCAPTCHA Admin Console. 2. Set NEXT_PUBLIC_RECAPTCHA_V3_SITE_KEY in .env.local. 3. Configure App Check in Firebase console with this key (and the secret key) and ENFORCE for relevant services (like Authentication).");
   }
 } else {
     console.log("[Firebase App Check] Not in browser environment, skipping App Check initialization.");
 }
 
+// Initialize other Firebase services AFTER App Check attempt
 let auth: Auth;
 let db: Firestore;
 let storage: FirebaseStorage;
