@@ -5,8 +5,8 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import * as z from "zod";
 import Link from "next/link";
-// import { sendPasswordResetEmail } from "firebase/auth"; // Firebase import removed
-// import { auth } from "@/lib/firebase"; // Firebase import removed
+import { sendPasswordResetEmail } from "firebase/auth"; 
+import { auth } from "@/lib/firebase"; 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
@@ -35,25 +35,23 @@ export default function ResetPasswordPage() {
 
   const onSubmit = async (data: ResetPasswordFormValues) => {
     setIsLoading(true);
-    console.warn("Reset Password onSubmit called with mock auth. Simulating for:", data.email);
-    // try {
-      // await sendPasswordResetEmail(auth, data.email); // Firebase call removed
-      await new Promise(resolve => setTimeout(resolve, 500)); // Simulate network delay
+    try {
+      await sendPasswordResetEmail(auth, data.email);
       toast({
-        title: "Password Reset Email Sent (Mock)",
-        description: "Please check your inbox for instructions to reset your password. (This is a mock response)",
+        title: "Password Reset Email Sent",
+        description: "Please check your inbox for instructions to reset your password.",
       });
       setEmailSent(true);
-    // } catch (error: any) {
-    //   console.error("Password reset error (Mock should not throw)", error);
-    //   toast({
-    //     title: "Password Reset Failed (Mock)",
-    //     description: error.message || "An unexpected error occurred. Please try again.",
-    //     variant: "destructive",
-    //   });
-    // } finally {
+    } catch (error: any) {
+      console.error("Password reset error", error);
+      toast({
+        title: "Password Reset Failed",
+        description: error.message || "An unexpected error occurred. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
       setIsLoading(false);
-    // }
+    }
   };
 
   return (
@@ -67,8 +65,8 @@ export default function ResetPasswordPage() {
           <CardTitle className="text-2xl font-headline">Reset Your Password</CardTitle>
           <CardDescription>
             {emailSent 
-              ? "Check your email for the reset link. (Mock)" 
-              : "Enter your email address and we&apos;ll send you a link to reset your password. (Auth is Mocked)"}
+              ? "Check your email for the reset link." 
+              : "Enter your email address and we&apos;ll send you a link to reset your password."}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -89,13 +87,13 @@ export default function ResetPasswordPage() {
                   )}
                 />
                 <Button type="submit" className="w-full" disabled={isLoading}>
-                  {isLoading ? "Sending..." : "Send Reset Link (Mock)"}
+                  {isLoading ? "Sending..." : "Send Reset Link"}
                 </Button>
               </form>
             </Form>
           ) : (
              <div className="text-center">
-                <p className="text-green-600">A password reset link has been sent to your email address. (Mock)</p>
+                <p className="text-green-600">A password reset link has been sent to your email address.</p>
              </div>
           )}
           <div className="mt-6 text-center text-sm">

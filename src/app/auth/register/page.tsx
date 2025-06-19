@@ -6,15 +6,15 @@ import { useForm } from "react-hook-form";
 import * as z from "zod";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-// import { createUserWithEmailAndPassword, updateProfile } from "firebase/auth"; // Firebase import removed
-// import { doc, setDoc } from "firebase/firestore"; // Firebase import removed
-// import { auth, db } from "@/lib/firebase"; // Firebase import removed
+import { createUserWithEmailAndPassword, updateProfile } from "firebase/auth";
+import { doc, setDoc } from "firebase/firestore"; 
+import { auth, db } from "@/lib/firebase"; 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
-// import type { UserProfile } from "@/types"; // Not needed for mock
+import type { UserProfile } from "@/types"; 
 import { ShieldAlert } from "lucide-react";
 import { useState } from "react";
 
@@ -42,37 +42,35 @@ export default function RegisterPage() {
 
   const onSubmit = async (data: RegisterFormValues) => {
     setIsLoading(true);
-    console.warn("Register onSubmit called with mock auth. Simulating registration for:", data.email);
-    // try {
-      // const userCredential = await createUserWithEmailAndPassword(auth, data.email, data.password); // Firebase call removed
-      // const user = userCredential.user; // Firebase call removed
+    try {
+      const userCredential = await createUserWithEmailAndPassword(auth, data.email, data.password);
+      const user = userCredential.user;
 
-      // await updateProfile(user, { displayName: data.displayName }); // Firebase call removed
+      await updateProfile(user, { displayName: data.displayName }); 
       
-      // const userProfileData: UserProfile = { // Firestore call removed
-      //   uid: user.uid,
-      //   email: user.email,
-      //   displayName: data.displayName,
-      //   role: 'user', 
-      // };
-      // await setDoc(doc(db, "users", user.uid), userProfileData); // Firestore call removed
-      await new Promise(resolve => setTimeout(resolve, 500)); // Simulate network delay
+      const userProfileData: UserProfile = { 
+        uid: user.uid,
+        email: user.email,
+        displayName: data.displayName,
+        role: 'user', // Default role for new users
+      };
+      await setDoc(doc(db, "users", user.uid), userProfileData);
 
       toast({
-        title: "Registration Successful (Mock)",
-        description: "Welcome to Safety Scan AI! (Authentication is currently mocked)",
+        title: "Registration Successful",
+        description: "Welcome to Safety Scan AI!",
       });
       router.push("/dashboard");
-    // } catch (error: any) {
-    //   console.error("Registration error (Mock should not throw)", error);
-    //   toast({
-    //     title: "Registration Failed (Mock)",
-    //     description: error.message || "An unexpected error occurred. Please try again.",
-    //     variant: "destructive",
-    //   });
-    // } finally {
+    } catch (error: any) {
+      console.error("Registration error", error);
+      toast({
+        title: "Registration Failed",
+        description: error.message || "An unexpected error occurred. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
       setIsLoading(false);
-    // }
+    }
   };
 
   return (
@@ -84,7 +82,7 @@ export default function RegisterPage() {
       <Card className="w-full max-w-md shadow-2xl">
         <CardHeader className="text-center">
           <CardTitle className="text-2xl font-headline">Create an Account</CardTitle>
-          <CardDescription>Join Safety Scan AI to start securing your applications. (Auth is Mocked)</CardDescription>
+          <CardDescription>Join Safety Scan AI to start securing your applications.</CardDescription>
         </CardHeader>
         <CardContent>
           <Form {...form}>
@@ -129,7 +127,7 @@ export default function RegisterPage() {
                 )}
               />
               <Button type="submit" className="w-full" disabled={isLoading}>
-                {isLoading ? "Creating Account..." : "Create Account (Mock)"}
+                {isLoading ? "Creating Account..." : "Create Account"}
               </Button>
             </form>
           </Form>

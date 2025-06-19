@@ -1,9 +1,8 @@
 
 import { initializeApp, getApps, FirebaseApp } from 'firebase/app';
-// import { getAuth, Auth } from 'firebase/auth'; // Original Auth import
+import { getAuth, Auth } from 'firebase/auth'; // Re-enabled real Auth import
 import { getFirestore, Firestore } from 'firebase/firestore';
 import { getStorage, FirebaseStorage } from 'firebase/storage';
-import type { UserCredential, User } from 'firebase/auth'; // Keep types for mock
 
 const firebaseConfigValues = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
@@ -15,7 +14,6 @@ const firebaseConfigValues = {
   measurementId: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID,
 };
 
-// --- Start of Configuration Validation Logic ---
 const criticalConfigKeys: (keyof typeof firebaseConfigValues)[] = ['apiKey', 'authDomain', 'projectId', 'appId'];
 let isConfigValid = true;
 const missingOrInvalidKeys: string[] = [];
@@ -53,8 +51,6 @@ The application will now halt.
 } else {
   console.log("Firebase config values (pre-initialization check passed):", firebaseConfigValues);
 }
-// --- End of Configuration Validation Logic ---
-
 
 let app: FirebaseApp;
 if (!getApps().length) {
@@ -68,83 +64,18 @@ if (!getApps().length) {
   app = getApps()[0];
 }
 
-// Mock User object, consistent with AuthContext's mock user for Firestore rule testing
-const mockUserForFirebaseAuth: User = {
-  uid: 'mockUser123', // Matches the uid in AuthContext
-  email: 'test@example.com',
-  displayName: 'Mock User (Admin)', // Matches displayName in AuthContext
-  photoURL: null,
-  emailVerified: true,
-  isAnonymous: false,
-  metadata: { creationTime: new Date().toISOString(), lastSignInTime: new Date().toISOString() },
-  providerData: [{
-    providerId: 'password',
-    uid: 'test@example.com',
-    displayName: 'Mock User (Admin)',
-    email: 'test@example.com',
-    phoneNumber: null,
-    photoURL: null,
-  }],
-  refreshToken: 'mockRefreshToken',
-  tenantId: null,
-  delete: async () => { console.warn('Mock user delete called'); Promise.resolve(); },
-  getIdToken: async () => 'mockIdToken',
-  getIdTokenResult: async () => ({ token: 'mockIdToken', expirationTime: (new Date().getTime() + 3600*1000).toString(), issuedAtTime: new Date().getTime().toString(), signInProvider: 'password', signInSecondFactor: null, claims: { role: 'admin' } }),
-  reload: async () => { console.warn('Mock user reload called'); Promise.resolve(); },
-  toJSON: () => ({ uid: 'mockUser123', email: 'test@example.com', displayName: 'Mock User (Admin)' }),
-};
-
-
-const mockAuth = {
-  createUserWithEmailAndPassword: async (authInstance: any, email: string, pass: string): Promise<UserCredential> => {
-    console.warn('Mock createUserWithEmailAndPassword called for:', email);
-    // @ts-ignore
-    return Promise.resolve({ user: { ...mockUserForFirebaseAuth, email }, operationType: 'signIn' });
-  },
-  signInWithEmailAndPassword: async (authInstance: any, email: string, pass: string): Promise<UserCredential> => {
-    console.warn('Mock signInWithEmailAndPassword called for:', email);
-    // @ts-ignore
-    return Promise.resolve({ user: { ...mockUserForFirebaseAuth, email }, operationType: 'signIn' });
-  },
-  sendPasswordResetEmail: async (authInstance: any, email: string): Promise<void> => {
-    console.warn('Mock sendPasswordResetEmail called for:', email);
-    return Promise.resolve();
-  },
-  onAuthStateChanged: (authInstance: any, callback: (user: User | null) => void): (() => void) => {
-    console.warn('Mock onAuthStateChanged called. AuthContext provides mock user.');
-    // callback(mockUserForFirebaseAuth); // This could be called to simulate an auth state change
-    return () => { console.warn('Mock onAuthStateChanged unsubscribed.'); };
-  },
-  signOut: async (authInstance: any): Promise<void> => {
-    console.warn('Mock signOut called from firebase.ts instance');
-    if (mockAuth.currentUser) {
-        // mockAuth.currentUser = null; // This line might cause issues if not handled carefully with React state
-        console.warn("Simulated mockAuth.currentUser to null. App state managed by AuthContext.");
-    }
-    return Promise.resolve();
-  },
-  currentUser: mockUserForFirebaseAuth, // Set currentUser to the mock user
-  updateProfile: async (user: User, profile: { displayName?: string | null, photoURL?: string | null }) => {
-    console.warn('Mock auth.updateProfile called for user:', user.uid, 'with profile:', profile);
-    if (mockAuth.currentUser && mockAuth.currentUser.uid === user.uid) {
-        mockAuth.currentUser.displayName = profile.displayName ?? mockAuth.currentUser.displayName;
-        mockAuth.currentUser.photoURL = profile.photoURL ?? mockAuth.currentUser.photoURL;
-    }
-    return Promise.resolve();
-  },
-  updateEmail: async (user: User, newEmail: string) => {
-    console.warn('Mock auth.updateEmail called for user:', user.uid, 'to new email:', newEmail);
-     if (mockAuth.currentUser && mockAuth.currentUser.uid === user.uid) {
-        mockAuth.currentUser.email = newEmail;
-    }
-    return Promise.resolve();
-  }
-};
-
-const auth = mockAuth as any; 
-
+let auth: Auth;
 let db: Firestore;
 let storage: FirebaseStorage;
+
+try {
+  auth = getAuth(app);
+  console.log("Firebase Auth service initialized successfully.");
+} catch (e: any) {
+    const errorMsg = `CRITICAL: Failed to initialize Firebase Auth service: ${e.message}. This usually means your Firebase project configuration is incorrect or the Auth service is not enabled. The application will halt.`;
+    console.error(errorMsg, e);
+    throw new Error(errorMsg);
+}
 
 try {
   db = getFirestore(app);
@@ -152,17 +83,16 @@ try {
 } catch (e: any) {
     const errorMsg = `CRITICAL: Failed to initialize Firestore service: ${e.message}. This usually means your Firebase project configuration (especially 'NEXT_PUBLIC_FIREBASE_PROJECT_ID' in .env.local) is incorrect or the project doesn't exist. The application will halt.`;
     console.error(errorMsg, e);
-    throw new Error(errorMsg); // Make it a hard stop
+    throw new Error(errorMsg);
 }
 
 try {
   storage = getStorage(app);
   console.log("Firebase Storage service initialized successfully.");
-} catch (e: any)
- {
+} catch (e: any) {
     const errorMsg = `CRITICAL: Failed to initialize Firebase Storage service: ${e.message}. Check Firebase project setup (especially 'NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET'). The application will halt.`;
     console.error(errorMsg, e);
-    throw new Error(errorMsg); // Make it a hard stop
+    throw new Error(errorMsg);
 }
 
 export { app, auth, db, storage };

@@ -2,10 +2,10 @@
 "use client";
 
 import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
-import type { User } from 'firebase/auth'; // Keep User type for mock
-// import { onAuthStateChanged, signOut as firebaseSignOut } from 'firebase/auth'; // Firebase import removed
-// import { doc, getDoc, setDoc } from 'firebase/firestore'; // Firebase import removed
-// import { auth, db } from '@/lib/firebase'; // Firebase import removed
+import type { User } from 'firebase/auth';
+import { onAuthStateChanged, signOut as firebaseSignOut } from 'firebase/auth';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { auth, db } from '@/lib/firebase';
 import type { UserProfile } from '@/types';
 import { useRouter } from 'next/navigation';
 
@@ -18,51 +18,59 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-// Mock User and UserProfile for testing
-const mockUserObject: User = {
-  uid: 'mockUser123',
-  email: 'test@example.com',
-  displayName: 'Mock User (Admin)',
-  photoURL: null,
-  emailVerified: true,
-  isAnonymous: false,
-  metadata: {},
-  providerData: [],
-  refreshToken: '',
-  tenantId: null,
-  delete: async () => { console.warn('Mock user delete called'); },
-  getIdToken: async () => 'mockIdToken',
-  getIdTokenResult: async () => ({ token: 'mockIdToken', expirationTime: '', issuedAtTime: '', signInProvider: null, signInSecondFactor: null, claims: {} }),
-  reload: async () => { console.warn('Mock user reload called'); },
-  toJSON: () => ({}),
-  getPhoneNumber: () => null,
-  providerId: 'password',
-};
-
-const mockUserProfileObject: UserProfile = {
-  uid: 'mockUser123',
-  email: 'test@example.com',
-  displayName: 'Mock User (Admin)',
-  photoURL: undefined,
-  role: 'admin', // Set to 'admin' for easier testing of admin features, or 'user'
-};
-
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
-  const [user, setUser] = useState<User | null>(mockUserObject);
-  const [userProfile, setUserProfile] = useState<UserProfile | null>(mockUserProfileObject);
-  const [loading, setLoading] = useState(false); // Set loading to false by default
+  const [user, setUser] = useState<User | null>(null);
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
+  const [loading, setLoading] = useState(true); // Start loading as true
   const router = useRouter();
 
-  // useEffect for onAuthStateChanged is removed as we are mocking auth state.
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      if (firebaseUser) {
+        setUser(firebaseUser);
+        const userDocRef = doc(db, "users", firebaseUser.uid);
+        const docSnap = await getDoc(userDocRef);
+        if (docSnap.exists()) {
+          setUserProfile(docSnap.data() as UserProfile);
+        } else {
+          // This case might happen if a user exists in Firebase Auth but not Firestore
+          // e.g. manual deletion of Firestore doc or incomplete registration.
+          // For now, we'll set a basic profile. A more robust solution might create it.
+           console.warn(`No Firestore profile found for user ${firebaseUser.uid}. This might be an incomplete registration or social auth without profile creation step.`);
+           // A default profile or null, depending on desired behavior.
+           // Setting to a default helps avoid errors in components expecting userProfile.
+           const defaultProfile: UserProfile = {
+             uid: firebaseUser.uid,
+             email: firebaseUser.email,
+             displayName: firebaseUser.displayName || 'New User',
+             role: 'user', // Default role
+           };
+           // Optionally create it in Firestore if it's missing
+           // await setDoc(userDocRef, defaultProfile);
+           setUserProfile(defaultProfile);
+        }
+      } else {
+        setUser(null);
+        setUserProfile(null);
+      }
+      setLoading(false);
+    });
+
+    return () => unsubscribe();
+  }, []);
 
   const logout = async () => {
-    console.warn("Mock logout called");
-    setUser(null);
-    setUserProfile(null);
-    router.push('/auth/login'); 
+    try {
+      await firebaseSignOut(auth);
+      // setUser(null); // onAuthStateChanged will handle this
+      // setUserProfile(null); // onAuthStateChanged will handle this
+      router.push('/auth/login');
+    } catch (error) {
+      console.error("Error signing out: ", error);
+      // Handle logout error (e.g., show a toast)
+    }
   };
   
-
   return (
     <AuthContext.Provider value={{ user, userProfile, loading, logout }}>
       {children}
