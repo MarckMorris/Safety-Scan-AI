@@ -15,6 +15,16 @@ const firebaseConfigValues = {
   measurementId: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID,
 };
 
+// Log the configuration being used - VERY IMPORTANT FOR DEBUGGING
+console.log("[Firebase Setup] USING THE FOLLOWING FIREBASE CONFIGURATION:");
+console.log("----------------------------------------------------");
+Object.entries(firebaseConfigValues).forEach(([key, value]) => {
+  console.log(`[Firebase Setup] ${key}: '${value}'`);
+});
+console.log("----------------------------------------------------");
+console.log("[Firebase Setup] IF ANY OF THE ABOVE VALUES ARE UNDEFINED, EMPTY, OR PLACEHOLDERS (e.g., 'YOUR_API_KEY'), \n[Firebase Setup] PLEASE CHECK YOUR '.env.local' FILE AND RESTART THE SERVER.");
+
+
 const criticalConfigKeys: (keyof typeof firebaseConfigValues)[] = ['apiKey', 'authDomain', 'projectId', 'appId'];
 let isConfigValid = true;
 const missingOrInvalidKeys: string[] = [];
@@ -50,16 +60,16 @@ The application will now halt.
   console.error(errorMessage);
   throw new Error(`Firebase configuration error: Missing or placeholder values for ${missingOrInvalidKeys.join(', ')}. Check server logs and .env.local.`);
 } else {
-  console.log("[Firebase Setup] Firebase core config values check passed.");
+  console.log("[Firebase Setup] Firebase core config values basic check passed (not empty, not obvious placeholders).");
 }
 
 let app: FirebaseApp;
 if (!getApps().length) {
   try {
-    app = initializeApp(firebaseConfigValues as any);
-    console.log("[Firebase Setup] Firebase App initialized successfully.");
+    app = initializeApp(firebaseConfigValues as any); // Type assertion as a temporary measure if some optional keys are undefined
+    console.log("[Firebase Setup] Firebase App initialized successfully with the logged configuration.");
   } catch (e: any) {
-    console.error("[Firebase Setup] CRITICAL: Firebase initializeApp(config) FAILED:", e.message, e);
+    console.error("[Firebase Setup] CRITICAL: Firebase initializeApp(config) FAILED. This usually means the provided configuration is fundamentally incorrect (e.g., malformed project ID). Error:", e.message, e);
     throw e;
   }
 } else {
@@ -67,6 +77,7 @@ if (!getApps().length) {
   console.log("[Firebase Setup] Existing Firebase App instance retrieved.");
 }
 
+// App Check Initialization (moved before getAuth)
 let appCheckInstance: AppCheck | undefined;
 if (typeof window !== "undefined") {
   const recaptchaSiteKey = process.env.NEXT_PUBLIC_RECAPTCHA_V3_SITE_KEY;
@@ -82,10 +93,11 @@ if (typeof window !== "undefined") {
         provider: new ReCaptchaV3Provider(recaptchaSiteKey),
         isTokenAutoRefreshEnabled: true,
       });
-      console.log("[Firebase App Check] Firebase App Check initialized successfully with reCAPTCHA v3. App Check instance:", appCheckInstance);
+      console.log("[Firebase App Check] Firebase App Check initialized successfully with reCAPTCHA v3. App Check instance:", appCheckInstance ? "Exists" : "Undefined");
     } catch (e: any) {
-      console.error("[Firebase App Check] Firebase App Check initialization FAILED. Error Name:", e.name, "Message:", e.message, "Stack:", e.stack);
-      console.error("[Firebase App Check] THIS IS LIKELY THE CAUSE OF AUTH ERRORS if App Check is enforced in Firebase console.");
+      console.error("[Firebase App Check] Firebase App Check initialization FAILED. Error Name:", e.name, "Message:", e.message);
+      // console.error("[Firebase App Check] Stack:", e.stack); // Can be very verbose
+      console.error("[Firebase App Check] THIS IS LIKELY THE CAUSE OF AUTH ERRORS if App Check is enforced in Firebase console and config is otherwise correct.");
     }
   } else {
     if (!recaptchaSiteKey || recaptchaSiteKey.trim() === "") {
@@ -93,11 +105,10 @@ if (typeof window !== "undefined") {
     } else {
         console.warn(`[Firebase App Check] App Check NOT initialized: NEXT_PUBLIC_RECAPTCHA_V3_SITE_KEY ('${recaptchaSiteKey}') appears to be a PLACEHOLDER value.`);
     }
-    console.warn("[Firebase App Check] If App Check (e.g., for Authentication) is ENFORCED in your Firebase project console, auth operations WILL LIKELY FAIL with errors like 'authInstance._getRecaptchaConfig is not a function' or similar network errors.");
-    console.warn("[Firebase App Check] To fix: 1. Get a reCAPTCHA v3 Site Key from Google reCAPTCHA Admin Console. 2. Set NEXT_PUBLIC_RECAPTCHA_V3_SITE_KEY in .env.local. 3. Configure App Check in Firebase console with this key (and the secret key) and ENFORCE for relevant services (like Authentication).");
+    console.warn("[Firebase App Check] If App Check (e.g., for Authentication) is ENFORCED in your Firebase project console, auth operations WILL LIKELY FAIL if App Check doesn't initialize.");
   }
 } else {
-    console.log("[Firebase App Check] Not in browser environment, skipping App Check initialization.");
+    console.log("[Firebase App Check] Not in browser environment, skipping App Check client initialization.");
 }
 
 // Initialize other Firebase services AFTER App Check attempt
@@ -107,14 +118,14 @@ let storage: FirebaseStorage;
 
 try {
   auth = getAuth(app);
-  console.log("[Firebase Setup] Firebase Auth service initialized successfully. Auth instance:", auth);
-  if(appCheckInstance) {
+  console.log("[Firebase Setup] Firebase Auth service instance retrieved/initialized successfully. Auth instance:", auth ? "Exists" : "Undefined");
+  if(appCheckInstance && typeof window !== 'undefined') {
     console.log("[Firebase Setup] App Check was initialized, Auth instance should be App Check-aware.");
-  } else if (typeof window !== 'undefined') {
-    console.warn("[Firebase Setup] Auth service initialized, but App Check was NOT. Potential issues if App Check is enforced.");
+  } else if (typeof window !== 'undefined' && (!process.env.NEXT_PUBLIC_RECAPTCHA_V3_SITE_KEY || process.env.NEXT_PUBLIC_RECAPTCHA_V3_SITE_KEY.includes("your_actual_recaptcha_v3_site_key_here"))) {
+    console.warn("[Firebase Setup] Auth service initialized, but App Check was NOT (due to missing/placeholder reCAPTCHA key). Potential issues if App Check is enforced for Auth.");
   }
 } catch (e: any) {
-    const errorMsg = `[Firebase Setup] CRITICAL: Failed to initialize Firebase Auth service: ${e.message}. This usually means your Firebase project configuration is incorrect or the Auth service is not enabled. The application will halt.`;
+    const errorMsg = `[Firebase Setup] CRITICAL: Failed to initialize Firebase Auth service: ${e.message}. This can happen if the Firebase app object ('app') is invalid due to prior config errors, or if the Auth service isn't properly enabled/configured in your Firebase project. The application will halt.`;
     console.error(errorMsg, e);
     throw new Error(errorMsg);
 }
@@ -123,7 +134,7 @@ try {
   db = getFirestore(app);
   console.log("[Firebase Setup] Firestore service initialized successfully.");
 } catch (e: any) {
-    const errorMsg = `[Firebase Setup] CRITICAL: Failed to initialize Firestore service: ${e.message}. This usually means your Firebase project configuration (especially 'NEXT_PUBLIC_FIREBASE_PROJECT_ID' in .env.local) is incorrect or the project doesn't exist. The application will halt.`;
+    const errorMsg = `[Firebase Setup] CRITICAL: Failed to initialize Firestore service: ${e.message}. Check Firebase project config (especially 'NEXT_PUBLIC_FIREBASE_PROJECT_ID'). The application will halt.`;
     console.error(errorMsg, e);
     throw new Error(errorMsg);
 }
@@ -132,9 +143,10 @@ try {
   storage = getStorage(app);
   console.log("[Firebase Setup] Firebase Storage service initialized successfully.");
 } catch (e: any) {
-    const errorMsg = `[Firebase Setup] CRITICAL: Failed to initialize Firebase Storage service: ${e.message}. Check Firebase project setup (especially 'NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET'). The application will halt.`;
+    const errorMsg = `[Firebase Setup] CRITICAL: Failed to initialize Firebase Storage service: ${e.message}. Check Firebase project config (especially 'NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET'). The application will halt.`;
     console.error(errorMsg, e);
     throw new Error(errorMsg);
 }
 
 export { app, auth, db, storage, appCheckInstance };
+
