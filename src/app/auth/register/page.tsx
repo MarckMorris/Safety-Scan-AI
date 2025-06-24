@@ -46,7 +46,7 @@ export default function RegisterPage() {
     if (!auth || !db) {
         toast({
             title: "Firebase Configuration Error",
-            description: "Firebase is not configured correctly. Please check the server logs and your .env.local file for errors.",
+            description: "Firebase is not configured correctly. Please check that your .env.local file has the correct values and that you have restarted the server.",
             variant: "destructive",
         });
         setIsLoading(false);
