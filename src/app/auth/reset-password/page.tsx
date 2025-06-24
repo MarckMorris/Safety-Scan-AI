@@ -1,4 +1,3 @@
-
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -35,6 +34,17 @@ export default function ResetPasswordPage() {
 
   const onSubmit = async (data: ResetPasswordFormValues) => {
     setIsLoading(true);
+
+    if (!auth) {
+        toast({
+            title: "Firebase Configuration Error",
+            description: "Firebase is not configured correctly. Please check the server logs and your .env.local file for errors.",
+            variant: "destructive",
+        });
+        setIsLoading(false);
+        return;
+    }
+
     try {
       await sendPasswordResetEmail(auth, data.email);
       toast({
@@ -42,7 +52,8 @@ export default function ResetPasswordPage() {
         description: "Please check your inbox for instructions to reset your password.",
       });
       setEmailSent(true);
-    } catch (error: any) {
+    } catch (error: any)
+    {
       console.error("Password reset error", error);
       toast({
         title: "Password Reset Failed",

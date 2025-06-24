@@ -1,4 +1,3 @@
-
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -42,6 +41,17 @@ export default function RegisterPage() {
 
   const onSubmit = async (data: RegisterFormValues) => {
     setIsLoading(true);
+
+    if (!auth || !db) {
+        toast({
+            title: "Firebase Configuration Error",
+            description: "Firebase is not configured correctly. Please check the server logs and your .env.local file for errors.",
+            variant: "destructive",
+        });
+        setIsLoading(false);
+        return;
+    }
+
     try {
       const userCredential = await createUserWithEmailAndPassword(auth, data.email, data.password);
       const user = userCredential.user;
@@ -63,9 +73,15 @@ export default function RegisterPage() {
       router.push("/dashboard");
     } catch (error: any) {
       console.error("Registration error", error);
+      let description = "An unexpected error occurred. Please try again.";
+      if (error.code === 'auth/email-already-in-use') {
+          description = "This email address is already in use. Please try another one or log in.";
+      } else if (error.code) {
+          description = error.message;
+      }
       toast({
         title: "Registration Failed",
-        description: error.message || "An unexpected error occurred. Please try again.",
+        description: description,
         variant: "destructive",
       });
     } finally {

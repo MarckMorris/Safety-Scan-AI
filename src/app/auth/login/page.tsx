@@ -1,4 +1,3 @@
-
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -38,6 +37,17 @@ export default function LoginPage() {
 
   const onSubmit = async (data: LoginFormValues) => {
     setIsLoading(true);
+    
+    if (!auth) {
+        toast({
+            title: "Firebase Configuration Error",
+            description: "Firebase is not configured correctly. Please check the server logs and your .env.local file for errors.",
+            variant: "destructive",
+        });
+        setIsLoading(false);
+        return;
+    }
+
     try {
       await signInWithEmailAndPassword(auth, data.email, data.password);
       toast({
@@ -47,9 +57,15 @@ export default function LoginPage() {
       router.push("/dashboard");
     } catch (error: any) {
       console.error("Login error", error);
+      let description = "An unexpected error occurred. Please try again.";
+      if (error.code === 'auth/invalid-credential') {
+          description = "Invalid email or password. Please check your credentials and try again.";
+      } else if (error.code) {
+          description = error.message;
+      }
       toast({
         title: "Login Failed",
-        description: error.message || "An unexpected error occurred. Please try again.",
+        description: description,
         variant: "destructive",
       });
     } finally {
