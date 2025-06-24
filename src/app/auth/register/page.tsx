@@ -15,8 +15,9 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import type { UserProfile } from "@/types"; 
-import { ShieldAlert } from "lucide-react";
+import { ShieldAlert, Terminal } from "lucide-react";
 import { useState } from "react";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 const registerSchema = z.object({
   displayName: z.string().min(2, { message: "Display name must be at least 2 characters." }),
@@ -30,6 +31,7 @@ export default function RegisterPage() {
   const router = useRouter();
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
+  const [configError, setConfigError] = useState<string | null>(null);
 
   const form = useForm<RegisterFormValues>({
     resolver: zodResolver(registerSchema),
@@ -42,11 +44,14 @@ export default function RegisterPage() {
 
   const onSubmit = async (data: RegisterFormValues) => {
     setIsLoading(true);
+    setConfigError(null); // Reset on new submission
 
     if (!auth || !db) {
+        const errorMsg = "Firebase is not configured correctly. Please check that your .env.local file has the correct values and that you have restarted the server.";
+        setConfigError(errorMsg);
         toast({
             title: "Firebase Configuration Error",
-            description: "Firebase is not configured correctly. Please check that your .env.local file has the correct values and that you have restarted the server.",
+            description: errorMsg,
             variant: "destructive",
         });
         setIsLoading(false);
@@ -75,13 +80,17 @@ export default function RegisterPage() {
     } catch (error: any) {
       console.error("Registration error", error);
       let description = "An unexpected error occurred. Please try again.";
+      
       if (error.code === 'auth/configuration-not-found') {
-          description = "Firebase configuration is incorrect. Please check that your .env.local file has the correct values from your Firebase project console, and then restart the server.";
+          const detailedError = "The Firebase configuration is incorrect. Please verify that your .env.local file contains the correct values from your Firebase project console, and then restart the development server.";
+          setConfigError(detailedError);
+          description = detailedError;
       } else if (error.code === 'auth/email-already-in-use') {
           description = "This email address is already in use. Please try another one or log in.";
       } else if (error.code) {
           description = error.message;
       }
+
       toast({
         title: "Registration Failed",
         description: description,
@@ -104,6 +113,15 @@ export default function RegisterPage() {
           <CardDescription>Join Safety Scan AI to start securing your applications.</CardDescription>
         </CardHeader>
         <CardContent>
+          {configError && (
+            <Alert variant="destructive" className="mb-6">
+              <Terminal className="h-4 w-4" />
+              <AlertTitle>Critical Configuration Error</AlertTitle>
+              <AlertDescription>
+                {configError}
+              </AlertDescription>
+            </Alert>
+          )}
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
               <FormField
