@@ -1,4 +1,3 @@
-
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -75,7 +74,9 @@ export default function RegisterPage() {
     } catch (error: any) {
       console.error("Registration error", error);
       let description = "An unexpected error occurred. Please try again.";
-      if (error.code === 'auth/email-already-in-use') {
+      if (error.code === 'auth/configuration-not-found') {
+          description = "Firebase configuration is incorrect. Please check that your .env.local file has the correct values from your Firebase project console, and then restart the server.";
+      } else if (error.code === 'auth/email-already-in-use') {
           description = "This email address is already in use. Please try another one or log in.";
       } else if (error.code) {
           description = error.message;
