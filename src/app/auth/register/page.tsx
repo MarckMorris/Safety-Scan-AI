@@ -46,6 +46,7 @@ export default function RegisterPage() {
     setIsLoading(true);
     setConfigError(null); // Reset on new submission
 
+    // This is the most important check. If Firebase services aren't initialized, stop immediately.
     if (!auth || !db) {
         const errorMsg = "Firebase is not configured correctly. Please check that your .env.local file has the correct values and that you have restarted the server.";
         setConfigError(errorMsg);
@@ -81,6 +82,7 @@ export default function RegisterPage() {
       console.error("Registration error", error);
       let description = "An unexpected error occurred. Please try again.";
       
+      // This catch block is crucial for handling errors from a *valid* auth object that Firebase servers reject.
       if (error.code === 'auth/configuration-not-found') {
           const detailedError = "The Firebase configuration is incorrect. Please verify that your .env.local file contains the correct values from your Firebase project console, and then restart the development server.";
           setConfigError(detailedError);
