@@ -1,9 +1,9 @@
 
-import { initializeApp, getApps, FirebaseApp } from 'firebase/app';
-import { getAuth, Auth } from 'firebase/auth';
-import { getFirestore, Firestore } from 'firebase/firestore';
-import { getStorage, FirebaseStorage } from 'firebase/storage';
-import { initializeAppCheck, ReCaptchaV3Provider, AppCheck } from 'firebase/app-check';
+import { initializeApp, getApps, type FirebaseApp } from 'firebase/app';
+import { getAuth, type Auth } from 'firebase/auth';
+import { getFirestore, type Firestore } from 'firebase/firestore';
+import { getStorage, type FirebaseStorage } from 'firebase/storage';
+import { initializeAppCheck, ReCaptchaV3Provider, type AppCheck } from 'firebase/app-check';
 
 const firebaseConfigValues = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
@@ -37,10 +37,10 @@ for (const key of criticalConfigKeys) {
   }
 }
 
-let app: FirebaseApp;
-let auth: Auth;
-let db: Firestore;
-let storage: FirebaseStorage;
+let app: FirebaseApp | null = null;
+let auth: Auth | null = null;
+let db: Firestore | null = null;
+let storage: FirebaseStorage | null = null;
 let appCheckInstance: AppCheck | undefined;
 
 if (!isConfigValid) {
@@ -65,7 +65,7 @@ THE APPLICATION WILL NOT FUNCTION CORRECTLY.
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!`;
   console.error(errorMessage);
   // We are NOT throwing an error here to allow the server to start.
-  // The app will fail at runtime when Firebase services are used.
+  // The app will fail at runtime when Firebase services (which will be null) are used.
 } else {
   console.log("[Firebase Setup] Firebase core config values basic check passed (not empty, not obvious placeholders).");
 
@@ -75,48 +75,21 @@ THE APPLICATION WILL NOT FUNCTION CORRECTLY.
       console.log("[Firebase Setup] Firebase App initialized successfully with the logged configuration.");
     } catch (e: any) {
       console.error("[Firebase Setup] CRITICAL: Firebase initializeApp(config) FAILED. This usually means the provided configuration is fundamentally incorrect (e.g., malformed project ID). Error:", e.message);
+      app = null; // Ensure app is null on failure
     }
   } else {
     app = getApps()[0];
     console.log("[Firebase Setup] Existing Firebase App instance retrieved.");
   }
 
-  // App Check Initialization
-  if (app! && typeof window !== "undefined") {
-    const recaptchaSiteKey = process.env.NEXT_PUBLIC_RECAPTCHA_V3_SITE_KEY;
-    console.log(`[Firebase App Check] NEXT_PUBLIC_RECAPTCHA_V3_SITE_KEY from .env.local: '${recaptchaSiteKey}'`);
-
-    if (recaptchaSiteKey && recaptchaSiteKey.trim() !== "" && !recaptchaSiteKey.includes("your_actual_recaptcha_v3_site_key_here") && !recaptchaSiteKey.startsWith("PASTE") && !recaptchaSiteKey.startsWith("YOUR")) {
-      console.log("[Firebase App Check] Valid reCAPTCHA v3 site key found. Attempting to initialize App Check...");
-      try {
-        appCheckInstance = initializeAppCheck(app, {
-          provider: new ReCaptchaV3Provider(recaptchaSiteKey),
-          isTokenAutoRefreshEnabled: true,
-        });
-        console.log("[Firebase App Check] Firebase App Check initialized successfully with reCAPTCHA v3.");
-      } catch (e: any) {
-        console.error("[Firebase App Check] Firebase App Check initialization FAILED. Error:", e.message);
-        console.error("[Firebase App Check] THIS IS LIKELY THE CAUSE OF AUTH ERRORS if App Check is enforced in Firebase console.");
-      }
-    } else {
-        if (!recaptchaSiteKey || recaptchaSiteKey.trim() === "") {
-            console.warn("[Firebase App Check] App Check NOT initialized: NEXT_PUBLIC_RECAPTCHA_V3_SITE_KEY is MISSING or EMPTY in .env.local.");
-        } else {
-            console.warn(`[Firebase App Check] App Check NOT initialized: NEXT_PUBLIC_RECAPTCHA_V3_SITE_KEY ('${recaptchaSiteKey}') appears to be a PLACEHOLDER value.`);
-        }
-        console.warn("[Firebase App Check] If App Check is ENFORCED for Authentication in your Firebase project, auth operations WILL LIKELY FAIL.");
-    }
-  } else if (!app!) {
-      console.error("[Firebase Setup] Firebase app object is invalid. Cannot initialize other services.");
-  }
-
-  // Initialize other Firebase services only if the app object is valid
-  if (app!) {
+  // Initialize other services only if the app object is valid
+  if (app) {
     try {
       auth = getAuth(app);
       console.log("[Firebase Setup] Firebase Auth service instance retrieved/initialized successfully.");
     } catch (e: any) {
         console.error(`[Firebase Setup] CRITICAL: Failed to initialize Firebase Auth service: ${e.message}.`);
+        auth = null;
     }
 
     try {
@@ -124,6 +97,7 @@ THE APPLICATION WILL NOT FUNCTION CORRECTLY.
       console.log("[Firebase Setup] Firestore service initialized successfully.");
     } catch (e: any) {
         console.error(`[Firebase Setup] CRITICAL: Failed to initialize Firestore service: ${e.message}.`);
+        db = null;
     }
 
     try {
@@ -131,6 +105,34 @@ THE APPLICATION WILL NOT FUNCTION CORRECTLY.
       console.log("[Firebase Setup] Firebase Storage service initialized successfully.");
     } catch (e: any) {
         console.error(`[Firebase Setup] CRITICAL: Failed to initialize Firebase Storage service: ${e.message}.`);
+        storage = null;
+    }
+    
+    // App Check Initialization
+    if (typeof window !== "undefined") {
+      const recaptchaSiteKey = process.env.NEXT_PUBLIC_RECAPTCHA_V3_SITE_KEY;
+      console.log(`[Firebase App Check] NEXT_PUBLIC_RECAPTCHA_V3_SITE_KEY from .env.local: '${recaptchaSiteKey}'`);
+
+      if (recaptchaSiteKey && recaptchaSiteKey.trim() !== "" && !recaptchaSiteKey.includes("your_actual_recaptcha_v3_site_key_here") && !recaptchaSiteKey.startsWith("PASTE") && !recaptchaSiteKey.startsWith("YOUR")) {
+        console.log("[Firebase App Check] Valid reCAPTCHA v3 site key found. Attempting to initialize App Check...");
+        try {
+          appCheckInstance = initializeAppCheck(app, {
+            provider: new ReCaptchaV3Provider(recaptchaSiteKey),
+            isTokenAutoRefreshEnabled: true,
+          });
+          console.log("[Firebase App Check] Firebase App Check initialized successfully with reCAPTCHA v3.");
+        } catch (e: any) {
+          console.error("[Firebase App Check] Firebase App Check initialization FAILED. Error:", e.message);
+          console.error("[Firebase App Check] THIS IS LIKELY THE CAUSE OF AUTH ERRORS if App Check is enforced in Firebase console.");
+        }
+      } else {
+          if (!recaptchaSiteKey || recaptchaSiteKey.trim() === "") {
+              console.warn("[Firebase App Check] App Check NOT initialized: NEXT_PUBLIC_RECAPTCHA_V3_SITE_KEY is MISSING or EMPTY in .env.local.");
+          } else {
+              console.warn(`[Firebase App Check] App Check NOT initialized: NEXT_PUBLIC_RECAPTCHA_V3_SITE_KEY ('${recaptchaSiteKey}') appears to be a PLACEHOLDER value.`);
+          }
+          console.warn("[Firebase App Check] If App Check is ENFORCED for Authentication in your Firebase project, auth operations WILL LIKELY FAIL.");
+      }
     }
   }
 }
