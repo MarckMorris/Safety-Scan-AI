@@ -55,9 +55,8 @@ export default function LoginPage() {
 
   useEffect(() => {
     setIsClient(true);
-    if (!isFirebaseInitialized) {
-        setShowConfigError(true);
-    }
+    // We no longer block rendering based on this check.
+    // The check will happen during the onSubmit logic.
   }, []);
 
   const form = useForm<LoginFormValues>({
@@ -72,11 +71,14 @@ export default function LoginPage() {
     setIsLoading(true);
     setError(null);
     
-    try {
-      if (!auth) {
+    // Check for initialization here, right before the call
+    if (!isFirebaseInitialized || !auth) {
         setShowConfigError(true);
-        throw new Error("Firebase is not initialized.");
-      }
+        setIsLoading(false);
+        return;
+    }
+    
+    try {
       await signInWithEmailAndPassword(auth, data.email, data.password);
       toast({
         title: "Login Successful",
@@ -85,9 +87,7 @@ export default function LoginPage() {
       router.push("/dashboard");
     } catch (error: any) {
       console.error("Login error", error);
-      if (error.code === 'auth/configuration-not-found') {
-        setShowConfigError(true);
-      } else if (error.code === 'auth/invalid-credential' || error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password') {
+      if (error.code === 'auth/configuration-not-found' || error.code === 'auth/invalid-credential' || error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password') {
           setError("Invalid email or password. Please check your credentials and try again.");
       } else {
         setError("An unexpected error occurred. Please try again.");

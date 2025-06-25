@@ -57,9 +57,8 @@ export default function RegisterPage() {
 
   useEffect(() => {
     setIsClient(true);
-    if (!isFirebaseInitialized) {
-        setShowConfigError(true);
-    }
+    // We no longer block rendering based on this check.
+    // The check will happen during the onSubmit logic.
   }, []);
 
   const form = useForm<RegisterFormValues>({
@@ -75,11 +74,13 @@ export default function RegisterPage() {
     setIsLoading(true);
     setError(null);
 
-    try {
-      if (!auth || !db) {
+    if (!isFirebaseInitialized || !auth || !db) {
         setShowConfigError(true);
-        throw new Error("Firebase is not initialized.");
-      }
+        setIsLoading(false);
+        return;
+    }
+
+    try {
       const userCredential = await createUserWithEmailAndPassword(auth, data.email, data.password);
       const user = userCredential.user;
 
@@ -100,7 +101,7 @@ export default function RegisterPage() {
       router.push("/dashboard");
     } catch (error: any) {
       console.error("Registration error", error);
-      if (error.code === 'auth/configuration-not-found') {
+       if (error.code === 'auth/configuration-not-found') {
         setShowConfigError(true);
       } else if (error.code === 'auth/email-already-in-use') {
           setError("This email address is already in use. Please try another one or log in.");

@@ -52,9 +52,8 @@ export default function ResetPasswordPage() {
 
   useEffect(() => {
     setIsClient(true);
-    if (!isFirebaseInitialized) {
-        setShowConfigError(true);
-    }
+    // We no longer block rendering based on this check.
+    // The check will happen during the onSubmit logic.
   }, []);
 
   const form = useForm<ResetPasswordFormValues>({
@@ -68,12 +67,14 @@ export default function ResetPasswordPage() {
     setIsLoading(true);
     setError(null);
     setEmailSent(false);
+    
+    if (!isFirebaseInitialized || !auth) {
+        setShowConfigError(true);
+        setIsLoading(false);
+        return;
+    }
 
     try {
-      if (!auth) {
-        setShowConfigError(true);
-        throw new Error("Firebase is not initialized.");
-      }
       await sendPasswordResetEmail(auth, data.email);
       toast({
         title: "Password Reset Email Sent",
