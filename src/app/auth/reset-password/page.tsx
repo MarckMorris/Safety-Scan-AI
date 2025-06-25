@@ -1,3 +1,4 @@
+
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -35,10 +36,12 @@ export default function ResetPasswordPage() {
   const onSubmit = async (data: ResetPasswordFormValues) => {
     setIsLoading(true);
 
+    const detailedErrorMsg = "Check your .env.local file for correct FIREBASE and RECAPTCHA keys, then restart the server.";
+
     if (!auth) {
         toast({
             title: "Firebase Configuration Error",
-            description: "Firebase is not configured correctly. Please check the server logs and your .env.local file for errors.",
+            description: detailedErrorMsg,
             variant: "destructive",
         });
         setIsLoading(false);
@@ -55,9 +58,15 @@ export default function ResetPasswordPage() {
     } catch (error: any)
     {
       console.error("Password reset error", error);
+      let description = "An unexpected error occurred. Please try again.";
+      if (error.code === 'auth/configuration-not-found') {
+          description = `Configuration Error: ${detailedErrorMsg}`;
+      } else {
+          description = error.message;
+      }
       toast({
         title: "Password Reset Failed",
-        description: error.message || "An unexpected error occurred. Please try again.",
+        description: description,
         variant: "destructive",
       });
     } finally {

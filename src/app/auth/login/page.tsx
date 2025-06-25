@@ -1,3 +1,4 @@
+
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -38,10 +39,12 @@ export default function LoginPage() {
   const onSubmit = async (data: LoginFormValues) => {
     setIsLoading(true);
     
+    const detailedErrorMsg = "Check your .env.local file for correct FIREBASE and RECAPTCHA keys, then restart the server.";
+
     if (!auth) {
         toast({
             title: "Firebase Configuration Error",
-            description: "Firebase is not configured correctly. Please check the server logs and your .env.local file for errors.",
+            description: detailedErrorMsg,
             variant: "destructive",
         });
         setIsLoading(false);
@@ -60,6 +63,8 @@ export default function LoginPage() {
       let description = "An unexpected error occurred. Please try again.";
       if (error.code === 'auth/invalid-credential') {
           description = "Invalid email or password. Please check your credentials and try again.";
+      } else if (error.code === 'auth/configuration-not-found') {
+          description = `Configuration Error: ${detailedErrorMsg}`;
       } else if (error.code) {
           description = error.message;
       }
