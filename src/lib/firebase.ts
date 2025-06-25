@@ -108,7 +108,8 @@ THE APPLICATION WILL NOT FUNCTION CORRECTLY.
         storage = null;
     }
     
-    // App Check Initialization
+    // App Check Initialization (Temporarily commented out for debugging)
+    /*
     if (typeof window !== "undefined") {
       const recaptchaSiteKey = process.env.NEXT_PUBLIC_RECAPTCHA_V3_SITE_KEY;
       console.log(`[Firebase App Check] NEXT_PUBLIC_RECAPTCHA_V3_SITE_KEY from .env.local: '${recaptchaSiteKey}'`);
@@ -134,6 +135,7 @@ THE APPLICATION WILL NOT FUNCTION CORRECTLY.
           console.warn("[Firebase App Check] If App Check is ENFORCED for Authentication in your Firebase project, auth operations WILL LIKELY FAIL.");
       }
     }
+    */
   }
 }
 
