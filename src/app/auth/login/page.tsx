@@ -7,7 +7,7 @@ import * as z from "zod";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { signInWithEmailAndPassword } from "firebase/auth"; 
-import { auth } from "@/lib/firebase"; 
+import { auth, isFirebaseInitialized } from "@/lib/firebase"; 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
@@ -31,9 +31,11 @@ export default function LoginPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isClient, setIsClient] = useState(false);
+  const [firebaseReady, setFirebaseReady] = useState(false);
 
   useEffect(() => {
     setIsClient(true);
+    setFirebaseReady(isFirebaseInitialized);
   }, []);
 
   const form = useForm<LoginFormValues>({
@@ -49,7 +51,6 @@ export default function LoginPage() {
     setError(null);
     
     try {
-      if (!auth) throw new Error("Firebase is not initialized. Please check your configuration.");
       await signInWithEmailAndPassword(auth, data.email, data.password);
       toast({
         title: "Login Successful",
@@ -59,9 +60,7 @@ export default function LoginPage() {
     } catch (error: any) {
       console.error("Login error", error);
       let description = "An unexpected error occurred. Please try again.";
-      if (error.code === 'auth/configuration-not-found') {
-        description = "Configuration Error: The app cannot connect to Firebase. Double-check that your .env.local file has the correct Firebase keys and that you have restarted the development server.";
-      } else if (error.code === 'auth/invalid-credential') {
+      if (error.code === 'auth/invalid-credential') {
           description = "Invalid email or password. Please check your credentials and try again.";
       } else if (error.message) {
           description = error.message;
@@ -76,6 +75,31 @@ export default function LoginPage() {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-background to-secondary/30">
         <Loader2 className="h-12 w-12 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (!firebaseReady) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-background to-secondary/30 py-12 px-4 sm:px-6 lg:px-8">
+          <Link href="/" className="flex items-center space-x-2 mb-8">
+              <ShieldAlert className="h-10 w-10 text-primary" />
+              <span className="font-bold text-3xl font-headline">Safety Scan AI</span>
+          </Link>
+          <Card className="w-full max-w-md shadow-2xl">
+              <CardHeader>
+                  <CardTitle className="text-2xl font-headline text-center">Configuration Error</CardTitle>
+              </CardHeader>
+              <CardContent>
+                  <Alert variant="destructive">
+                      <AlertTriangle className="h-4 w-4" />
+                      <AlertTitle>Critical Configuration Error</AlertTitle>
+                      <AlertDescription>
+                          The application cannot connect to the backend. Please check your <code>.env.local</code> file for correct Firebase keys and <strong>restart your development server</strong>.
+                      </AlertDescription>
+                  </Alert>
+              </CardContent>
+          </Card>
       </div>
     );
   }
