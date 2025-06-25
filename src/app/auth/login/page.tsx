@@ -13,8 +13,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
-import { ShieldAlert } from "lucide-react";
-import { useState } from "react";
+import { ShieldAlert, Terminal } from "lucide-react";
+import { useState, type ReactNode } from "react";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 const loginSchema = z.object({
   email: z.string().email({ message: "Invalid email address." }),
@@ -27,6 +28,7 @@ export default function LoginPage() {
   const router = useRouter();
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
+  const [configError, setConfigError] = useState<ReactNode | null>(null);
 
   const form = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
@@ -36,15 +38,27 @@ export default function LoginPage() {
     },
   });
 
+  const DetailedError = (
+    <>
+      <p className="mb-2">This usually happens for one of these reasons:</p>
+      <ul className="list-disc space-y-1 pl-5 text-xs">
+        <li>The <strong>`NEXT_PUBLIC_FIREBASE_...`</strong> values in your <code>.env.local</code> file are incorrect.</li>
+        <li>The <strong>`NEXT_PUBLIC_RECAPTCHA_V3_SITE_KEY`</strong> value is missing or incorrect (required for App Check).</li>
+        <li>You did not <strong>restart the development server</strong> after editing the <code>.env.local</code> file.</li>
+      </ul>
+      <p className="mt-3">Please double-check all values, restart your server, and try again.</p>
+    </>
+  );
+
   const onSubmit = async (data: LoginFormValues) => {
     setIsLoading(true);
-    
-    const detailedErrorMsg = "Check your .env.local file for correct FIREBASE and RECAPTCHA keys, then restart the server.";
+    setConfigError(null);
 
     if (!auth) {
+        setConfigError(DetailedError);
         toast({
-            title: "Firebase Configuration Error",
-            description: detailedErrorMsg,
+            title: "Critical Firebase Configuration Error",
+            description: "Please see the error message on the page for details.",
             variant: "destructive",
         });
         setIsLoading(false);
@@ -64,7 +78,8 @@ export default function LoginPage() {
       if (error.code === 'auth/invalid-credential') {
           description = "Invalid email or password. Please check your credentials and try again.";
       } else if (error.code === 'auth/configuration-not-found') {
-          description = `Configuration Error: ${detailedErrorMsg}`;
+          setConfigError(DetailedError);
+          description = "Your Firebase configuration is incorrect. See the on-page message for details.";
       } else if (error.code) {
           description = error.message;
       }
@@ -90,6 +105,15 @@ export default function LoginPage() {
           <CardDescription>Sign in to access your dashboard and scan history.</CardDescription>
         </CardHeader>
         <CardContent>
+          {configError && (
+            <Alert variant="destructive" className="mb-6">
+              <Terminal className="h-4 w-4" />
+              <AlertTitle>Critical Configuration Error</AlertTitle>
+              <AlertDescription>
+                {configError}
+              </AlertDescription>
+            </Alert>
+          )}
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
               <FormField
