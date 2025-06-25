@@ -7,14 +7,16 @@ import * as z from "zod";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { signInWithEmailAndPassword } from "firebase/auth"; 
-import { auth } from "@/lib/firebase"; 
+import { auth, isFirebaseInitialized } from "@/lib/firebase"; 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
-import { ShieldAlert } from "lucide-react";
+import { ShieldAlert, AlertTriangle } from "lucide-react"; 
 import { useState } from "react";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"; 
+
 
 const loginSchema = z.object({
   email: z.string().email({ message: "Invalid email address." }),
@@ -38,11 +40,11 @@ export default function LoginPage() {
 
   const onSubmit = async (data: LoginFormValues) => {
     setIsLoading(true);
-
-    if (!auth) {
+    
+    if (!isFirebaseInitialized || !auth) {
         toast({
-            title: "Firebase Not Configured",
-            description: "The Firebase configuration is missing or incorrect. Please check your .env.local file and restart the server.",
+            title: "Configuration Error",
+            description: "Firebase is not configured correctly. Check the on-page message.",
             variant: "destructive",
         });
         setIsLoading(false);
@@ -61,8 +63,6 @@ export default function LoginPage() {
       let description = "An unexpected error occurred. Please try again.";
       if (error.code === 'auth/invalid-credential') {
           description = "Invalid email or password. Please check your credentials and try again.";
-      } else if (error.code === 'auth/configuration-not-found') {
-          description = "Your Firebase configuration is incorrect. Please check your .env.local file and restart the server.";
       } else if (error.code) {
           description = error.message;
       }
@@ -88,50 +88,62 @@ export default function LoginPage() {
           <CardDescription>Sign in to access your dashboard and scan history.</CardDescription>
         </CardHeader>
         <CardContent>
-          <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-              <FormField
-                control={form.control}
-                name="email"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Email Address</FormLabel>
-                    <FormControl>
-                      <Input type="email" placeholder="you@example.com" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="password"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Password</FormLabel>
-                    <FormControl>
-                      <Input type="password" placeholder="••••••••" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <div className="flex items-center justify-between text-sm">
-                <Link href="/auth/reset-password" passHref>
-                  <Button variant="link" type="button" className="p-0 h-auto font-normal">Forgot password?</Button>
+          {!isFirebaseInitialized ? (
+            <Alert variant="destructive" className="mb-6">
+              <AlertTriangle className="h-4 w-4" />
+              <AlertTitle>Critical Configuration Error</AlertTitle>
+              <AlertDescription>
+                The application cannot connect to the backend. Please check your server's startup logs in the terminal for detailed diagnostic information about your `.env.local` file, then restart the server.
+              </AlertDescription>
+            </Alert>
+          ) : (
+            <>
+              <Form {...form}>
+                <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+                  <FormField
+                    control={form.control}
+                    name="email"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Email Address</FormLabel>
+                        <FormControl>
+                          <Input type="email" placeholder="you@example.com" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="password"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Password</FormLabel>
+                        <FormControl>
+                          <Input type="password" placeholder="••••••••" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <div className="flex items-center justify-between text-sm">
+                    <Link href="/auth/reset-password" passHref>
+                      <Button variant="link" type="button" className="p-0 h-auto font-normal">Forgot password?</Button>
+                    </Link>
+                  </div>
+                  <Button type="submit" className="w-full" disabled={isLoading}>
+                    {isLoading ? "Signing In..." : "Sign In"}
+                  </Button>
+                </form>
+              </Form>
+              <div className="mt-6 text-center text-sm">
+                Don&apos;t have an account?{" "}
+                <Link href="/auth/register" passHref>
+                  <Button variant="link" type="button" className="p-0 h-auto font-normal">Sign up</Button>
                 </Link>
               </div>
-              <Button type="submit" className="w-full" disabled={isLoading}>
-                {isLoading ? "Signing In..." : "Sign In"}
-              </Button>
-            </form>
-          </Form>
-          <div className="mt-6 text-center text-sm">
-            Don&apos;t have an account?{" "}
-            <Link href="/auth/register" passHref>
-               <Button variant="link" type="button" className="p-0 h-auto font-normal">Sign up</Button>
-            </Link>
-          </div>
+            </>
+          )}
         </CardContent>
       </Card>
     </div>
