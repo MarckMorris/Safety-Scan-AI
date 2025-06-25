@@ -6,7 +6,7 @@ import { useForm } from "react-hook-form";
 import * as z from "zod";
 import Link from "next/link";
 import { sendPasswordResetEmail } from "firebase/auth"; 
-import { auth, isFirebaseInitialized } from "@/lib/firebase"; 
+import { auth } from "@/lib/firebase"; 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
@@ -60,7 +60,7 @@ export default function ResetPasswordPage() {
       let description = "An unexpected error occurred. Please try again.";
       if (error.code === 'auth/configuration-not-found') {
           description = "Configuration Error: The app cannot connect to Firebase. Double-check that your .env.local file has the correct Firebase keys and that you have restarted the development server.";
-      } else if (error.code) {
+      } else if (error.message) {
           description = error.message;
       }
       setError(description);

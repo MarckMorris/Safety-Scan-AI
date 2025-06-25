@@ -7,7 +7,7 @@ import * as z from "zod";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { signInWithEmailAndPassword } from "firebase/auth"; 
-import { auth, isFirebaseInitialized } from "@/lib/firebase"; 
+import { auth } from "@/lib/firebase"; 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
@@ -63,7 +63,7 @@ export default function LoginPage() {
         description = "Configuration Error: The app cannot connect to Firebase. Double-check that your .env.local file has the correct Firebase keys and that you have restarted the development server.";
       } else if (error.code === 'auth/invalid-credential') {
           description = "Invalid email or password. Please check your credentials and try again.";
-      } else if (error.code) {
+      } else if (error.message) {
           description = error.message;
       }
       setError(description);
