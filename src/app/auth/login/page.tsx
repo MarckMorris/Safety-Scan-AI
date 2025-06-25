@@ -60,7 +60,7 @@ export default function LoginPage() {
     } catch (error: any) {
       console.error("Login error", error);
       let description = "An unexpected error occurred. Please try again.";
-      if (error.code === 'auth/invalid-credential') {
+      if (error.code === 'auth/invalid-credential' || error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password') {
           description = "Invalid email or password. Please check your credentials and try again.";
       } else if (error.message) {
           description = error.message;
@@ -157,7 +157,7 @@ export default function LoginPage() {
                 </Link>
                 </div>
                 <Button type="submit" className="w-full" disabled={isLoading}>
-                {isLoading ? "Signing In..." : "Sign In"}
+                {isLoading ? <><Loader2 className="h-4 w-4 animate-spin mr-2" />Signing In...</> : "Sign In"}
                 </Button>
             </form>
             </Form>
