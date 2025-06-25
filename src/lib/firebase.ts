@@ -28,7 +28,7 @@ const isConfigValid =
   firebaseConfig.projectId &&
   !firebaseConfig.apiKey.includes('YOUR_API_KEY'); // A simple check for placeholder values
 
-if (isConfigValid) {
+if (typeof window !== 'undefined' && isConfigValid) {
   try {
     if (getApps().length === 0) {
       app = initializeApp(firebaseConfig);
@@ -40,17 +40,13 @@ if (isConfigValid) {
     db = getFirestore(app);
     storage = getStorage(app);
     isFirebaseInitialized = true;
-    console.log("[Firebase] Initialization successful.");
 
   } catch (e) {
       console.error("[Firebase] CRITICAL ERROR during initialization:", e);
       isFirebaseInitialized = false;
   }
-} else {
-    console.error("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
-    console.error("!!!! [Firebase] CONFIG IS MISSING OR INVALID    !!!!");
-    console.error("!!!! Check your .env.local file and RESTART the server.");
-    console.error("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
+} else if (!isConfigValid) {
+    console.error("[Firebase] CONFIG IS MISSING OR INVALID. Check your .env.local file and RESTART the server.");
 }
 
 export { app, auth, db, storage, isFirebaseInitialized };

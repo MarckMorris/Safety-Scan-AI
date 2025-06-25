@@ -26,7 +26,8 @@ export default function ResetPasswordPage() {
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
   const [emailSent, setEmailSent] = useState(false);
-  const [isConfigError, setIsConfigError] = useState(!isFirebaseInitialized);
+  const [error, setError] = useState<string | null>(null);
+
 
   const form = useForm<ResetPasswordFormValues>({
     resolver: zodResolver(resetPasswordSchema),
@@ -37,15 +38,11 @@ export default function ResetPasswordPage() {
 
   const onSubmit = async (data: ResetPasswordFormValues) => {
     setIsLoading(true);
-
-    if (!auth) {
-        setIsConfigError(true);
-        setIsLoading(false);
-        return;
-    }
+    setError(null);
+    setEmailSent(false);
 
     try {
-      await sendPasswordResetEmail(auth, data.email);
+      await sendPasswordResetEmail(auth!, data.email);
       toast({
         title: "Password Reset Email Sent",
         description: "Please check your inbox for instructions to reset your password.",
@@ -55,22 +52,39 @@ export default function ResetPasswordPage() {
     {
       console.error("Password reset error", error);
       let description = "An unexpected error occurred. Please try again.";
-      if (error.code === 'auth/configuration-not-found') {
-        setIsConfigError(true);
-        return; // Stop execution and show the config error alert
-      }
       if (error.code) {
           description = error.message;
       }
-      toast({
-        title: "Password Reset Failed",
-        description: description,
-        variant: "destructive",
-      });
+      setError(description);
     } finally {
       setIsLoading(false);
     }
   };
+
+  if (!isFirebaseInitialized) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-background to-secondary/30 py-12 px-4 sm:px-6 lg:px-8">
+         <Link href="/" className="flex items-center space-x-2 mb-8">
+            <ShieldAlert className="h-10 w-10 text-primary" />
+            <span className="font-bold text-3xl font-headline">Safety Scan AI</span>
+          </Link>
+        <Card className="w-full max-w-md shadow-2xl">
+          <CardHeader>
+            <CardTitle>Configuration Error</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <Alert variant="destructive">
+                <AlertTriangle className="h-4 w-4" />
+                <AlertTitle>Critical Configuration Error</AlertTitle>
+                <AlertDescription>
+                    The application cannot connect to the backend. Please check your `.env.local` file for correct Firebase keys and **restart your development server**.
+                </AlertDescription>
+            </Alert>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-background to-secondary/30 py-12 px-4 sm:px-6 lg:px-8">
@@ -88,15 +102,14 @@ export default function ResetPasswordPage() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          {isConfigError ? (
-            <Alert variant="destructive" className="mb-6">
-              <AlertTriangle className="h-4 w-4" />
-              <AlertTitle>Critical Configuration Error</AlertTitle>
-              <AlertDescription>
-                The application cannot connect to the backend. Please check your `.env.local` file for correct Firebase keys and **restart your development server**.
-              </AlertDescription>
-            </Alert>
-          ) : !emailSent ? (
+          {error && (
+              <Alert variant="destructive" className="mb-6">
+                  <AlertTriangle className="h-4 w-4" />
+                  <AlertTitle>Request Failed</AlertTitle>
+                  <AlertDescription>{error}</AlertDescription>
+              </Alert>
+          )}
+          {!emailSent ? (
             <Form {...form}>
               <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
                 <FormField

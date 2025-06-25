@@ -31,7 +31,7 @@ export default function RegisterPage() {
   const router = useRouter();
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
-  const [isConfigError, setIsConfigError] = useState(!isFirebaseInitialized);
+  const [error, setError] = useState<string | null>(null);
 
   const form = useForm<RegisterFormValues>({
     resolver: zodResolver(registerSchema),
@@ -44,15 +44,10 @@ export default function RegisterPage() {
 
   const onSubmit = async (data: RegisterFormValues) => {
     setIsLoading(true);
-
-    if (!auth || !db) {
-        setIsConfigError(true);
-        setIsLoading(false);
-        return;
-    }
+    setError(null);
 
     try {
-      const userCredential = await createUserWithEmailAndPassword(auth, data.email, data.password);
+      const userCredential = await createUserWithEmailAndPassword(auth!, data.email, data.password);
       const user = userCredential.user;
 
       await updateProfile(user, { displayName: data.displayName }); 
@@ -63,7 +58,7 @@ export default function RegisterPage() {
         displayName: data.displayName,
         role: 'user', 
       };
-      await setDoc(doc(db, "users", user.uid), userProfileData);
+      await setDoc(doc(db!, "users", user.uid), userProfileData);
 
       toast({
         title: "Registration Successful",
@@ -73,26 +68,41 @@ export default function RegisterPage() {
     } catch (error: any) {
       console.error("Registration error", error);
       let description = "An unexpected error occurred. Please try again.";
-      
-      if (error.code === 'auth/configuration-not-found') {
-        setIsConfigError(true);
-        return; // Stop execution and show the config error alert
-      }
       if (error.code === 'auth/email-already-in-use') {
           description = "This email address is already in use. Please try another one or log in.";
       } else if (error.code) {
           description = error.message;
       }
-
-      toast({
-        title: "Registration Failed",
-        description: description,
-        variant: "destructive",
-      });
+      setError(description);
     } finally {
       setIsLoading(false);
     }
   };
+
+  if (!isFirebaseInitialized) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-background to-secondary/30 py-12 px-4 sm:px-6 lg:px-8">
+         <Link href="/" className="flex items-center space-x-2 mb-8">
+            <ShieldAlert className="h-10 w-10 text-primary" />
+            <span className="font-bold text-3xl font-headline">Safety Scan AI</span>
+          </Link>
+        <Card className="w-full max-w-md shadow-2xl">
+          <CardHeader>
+            <CardTitle>Configuration Error</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <Alert variant="destructive">
+                <AlertTriangle className="h-4 w-4" />
+                <AlertTitle>Critical Configuration Error</AlertTitle>
+                <AlertDescription>
+                    The application cannot connect to the backend. Please check your `.env.local` file for correct Firebase keys and **restart your development server**.
+                </AlertDescription>
+            </Alert>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-background to-secondary/30 py-12 px-4 sm:px-6 lg:px-8">
@@ -106,70 +116,65 @@ export default function RegisterPage() {
           <CardDescription>Join Safety Scan AI to start securing your applications.</CardDescription>
         </CardHeader>
         <CardContent>
-          {isConfigError ? (
-            <Alert variant="destructive" className="mb-6">
-              <AlertTriangle className="h-4 w-4" />
-              <AlertTitle>Critical Configuration Error</AlertTitle>
-              <AlertDescription>
-                The application cannot connect to the backend. Please check your `.env.local` file for correct Firebase keys and **restart your development server**.
-              </AlertDescription>
-            </Alert>
-          ) : (
-            <>
-              <Form {...form}>
-                <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-                  <FormField
-                    control={form.control}
-                    name="displayName"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Display Name</FormLabel>
-                        <FormControl>
-                          <Input placeholder="Your Name" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="email"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Email Address</FormLabel>
-                        <FormControl>
-                          <Input type="email" placeholder="you@example.com" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="password"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Password</FormLabel>
-                        <FormControl>
-                          <Input type="password" placeholder="••••••••" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <Button type="submit" className="w-full" disabled={isLoading}>
-                    {isLoading ? "Creating Account..." : "Create Account"}
-                  </Button>
-                </form>
-              </Form>
-              <div className="mt-6 text-center text-sm">
-                Already have an account?{" "}
-                <Link href="/auth/login" passHref>
-                  <Button variant="link" type="button" className="p-0 h-auto font-normal">Sign in</Button>
-                </Link>
-              </div>
-            </>
-          )}
+            {error && (
+                <Alert variant="destructive" className="mb-6">
+                    <AlertTriangle className="h-4 w-4" />
+                    <AlertTitle>Registration Failed</AlertTitle>
+                    <AlertDescription>{error}</AlertDescription>
+                </Alert>
+            )}
+            <Form {...form}>
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+                <FormField
+                control={form.control}
+                name="displayName"
+                render={({ field }) => (
+                    <FormItem>
+                    <FormLabel>Display Name</FormLabel>
+                    <FormControl>
+                        <Input placeholder="Your Name" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                    </FormItem>
+                )}
+                />
+                <FormField
+                control={form.control}
+                name="email"
+                render={({ field }) => (
+                    <FormItem>
+                    <FormLabel>Email Address</FormLabel>
+                    <FormControl>
+                        <Input type="email" placeholder="you@example.com" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                    </FormItem>
+                )}
+                />
+                <FormField
+                control={form.control}
+                name="password"
+                render={({ field }) => (
+                    <FormItem>
+                    <FormLabel>Password</FormLabel>
+                    <FormControl>
+                        <Input type="password" placeholder="••••••••" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                    </FormItem>
+                )}
+                />
+                <Button type="submit" className="w-full" disabled={isLoading}>
+                {isLoading ? "Creating Account..." : "Create Account"}
+                </Button>
+            </form>
+            </Form>
+            <div className="mt-6 text-center text-sm">
+            Already have an account?{" "}
+            <Link href="/auth/login" passHref>
+                <Button variant="link" type="button" className="p-0 h-auto font-normal">Sign in</Button>
+            </Link>
+            </div>
         </CardContent>
       </Card>
     </div>

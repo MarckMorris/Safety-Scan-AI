@@ -29,7 +29,7 @@ export default function LoginPage() {
   const router = useRouter();
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
-  const [isConfigError, setIsConfigError] = useState(!isFirebaseInitialized);
+  const [error, setError] = useState<string | null>(null);
 
   const form = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
@@ -41,15 +41,10 @@ export default function LoginPage() {
 
   const onSubmit = async (data: LoginFormValues) => {
     setIsLoading(true);
+    setError(null);
     
-    if (!auth) {
-        setIsConfigError(true);
-        setIsLoading(false);
-        return;
-    }
-
     try {
-      await signInWithEmailAndPassword(auth, data.email, data.password);
+      await signInWithEmailAndPassword(auth!, data.email, data.password);
       toast({
         title: "Login Successful",
         description: "Welcome back!",
@@ -58,24 +53,42 @@ export default function LoginPage() {
     } catch (error: any) {
       console.error("Login error", error);
       let description = "An unexpected error occurred. Please try again.";
-      if (error.code === 'auth/configuration-not-found') {
-        setIsConfigError(true);
-        return; // Stop execution and show the config error alert
-      }
       if (error.code === 'auth/invalid-credential') {
           description = "Invalid email or password. Please check your credentials and try again.";
       } else if (error.code) {
           description = error.message;
       }
-      toast({
-        title: "Login Failed",
-        description: description,
-        variant: "destructive",
-      });
+      setError(description);
     } finally {
       setIsLoading(false);
     }
   };
+
+  if (!isFirebaseInitialized) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-background to-secondary/30 py-12 px-4 sm:px-6 lg:px-8">
+         <Link href="/" className="flex items-center space-x-2 mb-8">
+            <ShieldAlert className="h-10 w-10 text-primary" />
+            <span className="font-bold text-3xl font-headline">Safety Scan AI</span>
+          </Link>
+        <Card className="w-full max-w-md shadow-2xl">
+          <CardHeader>
+            <CardTitle>Configuration Error</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <Alert variant="destructive">
+                <AlertTriangle className="h-4 w-4" />
+                <AlertTitle>Critical Configuration Error</AlertTitle>
+                <AlertDescription>
+                    The application cannot connect to the backend. Please check your `.env.local` file for correct Firebase keys and **restart your development server**.
+                </AlertDescription>
+            </Alert>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-background to-secondary/30 py-12 px-4 sm:px-6 lg:px-8">
@@ -89,62 +102,57 @@ export default function LoginPage() {
           <CardDescription>Sign in to access your dashboard and scan history.</CardDescription>
         </CardHeader>
         <CardContent>
-          {isConfigError ? (
-            <Alert variant="destructive" className="mb-6">
-              <AlertTriangle className="h-4 w-4" />
-              <AlertTitle>Critical Configuration Error</AlertTitle>
-              <AlertDescription>
-                The application cannot connect to the backend. Please check your `.env.local` file for correct Firebase keys and **restart your development server**.
-              </AlertDescription>
-            </Alert>
-          ) : (
-            <>
-              <Form {...form}>
-                <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-                  <FormField
-                    control={form.control}
-                    name="email"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Email Address</FormLabel>
-                        <FormControl>
-                          <Input type="email" placeholder="you@example.com" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="password"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Password</FormLabel>
-                        <FormControl>
-                          <Input type="password" placeholder="••••••••" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <div className="flex items-center justify-between text-sm">
-                    <Link href="/auth/reset-password" passHref>
-                      <Button variant="link" type="button" className="p-0 h-auto font-normal">Forgot password?</Button>
-                    </Link>
-                  </div>
-                  <Button type="submit" className="w-full" disabled={isLoading}>
-                    {isLoading ? "Signing In..." : "Sign In"}
-                  </Button>
-                </form>
-              </Form>
-              <div className="mt-6 text-center text-sm">
-                Don&apos;t have an account?{" "}
-                <Link href="/auth/register" passHref>
-                  <Button variant="link" type="button" className="p-0 h-auto font-normal">Sign up</Button>
+            {error && (
+                 <Alert variant="destructive" className="mb-6">
+                    <AlertTriangle className="h-4 w-4" />
+                    <AlertTitle>Login Failed</AlertTitle>
+                    <AlertDescription>{error}</AlertDescription>
+                 </Alert>
+            )}
+            <Form {...form}>
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+                <FormField
+                control={form.control}
+                name="email"
+                render={({ field }) => (
+                    <FormItem>
+                    <FormLabel>Email Address</FormLabel>
+                    <FormControl>
+                        <Input type="email" placeholder="you@example.com" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                    </FormItem>
+                )}
+                />
+                <FormField
+                control={form.control}
+                name="password"
+                render={({ field }) => (
+                    <FormItem>
+                    <FormLabel>Password</FormLabel>
+                    <FormControl>
+                        <Input type="password" placeholder="••••••••" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                    </FormItem>
+                )}
+                />
+                <div className="flex items-center justify-between text-sm">
+                <Link href="/auth/reset-password" passHref>
+                    <Button variant="link" type="button" className="p-0 h-auto font-normal">Forgot password?</Button>
                 </Link>
-              </div>
-            </>
-          )}
+                </div>
+                <Button type="submit" className="w-full" disabled={isLoading}>
+                {isLoading ? "Signing In..." : "Sign In"}
+                </Button>
+            </form>
+            </Form>
+            <div className="mt-6 text-center text-sm">
+            Don&apos;t have an account?{" "}
+            <Link href="/auth/register" passHref>
+                <Button variant="link" type="button" className="p-0 h-auto font-normal">Sign up</Button>
+            </Link>
+            </div>
         </CardContent>
       </Card>
     </div>
