@@ -3,8 +3,6 @@ import { initializeApp, getApps, type FirebaseApp } from 'firebase/app';
 import { getAuth, type Auth } from 'firebase/auth';
 import { getFirestore, type Firestore } from 'firebase/firestore';
 import { getStorage, type FirebaseStorage } from 'firebase/storage';
-// AppCheck is temporarily commented out to simplify debugging the core connection.
-// import { initializeAppCheck, ReCaptchaV3Provider, type AppCheck } from 'firebase/app-check';
 
 const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
@@ -22,11 +20,13 @@ let db: Firestore | null = null;
 let storage: FirebaseStorage | null = null;
 let isFirebaseInitialized = false;
 
-// Basic check to see if the configuration is populated
+// This check is crucial for preventing crashes.
+// It verifies that the environment variables are actually loaded.
 const isConfigValid =
   firebaseConfig.apiKey &&
   firebaseConfig.projectId &&
-  !firebaseConfig.apiKey.includes('YOUR_API_KEY'); // A simple check for placeholder values
+  !firebaseConfig.apiKey.includes('public') && // A simple check for placeholder values
+  !firebaseConfig.apiKey.includes('your');
 
 if (typeof window !== 'undefined' && isConfigValid) {
   try {
@@ -45,7 +45,7 @@ if (typeof window !== 'undefined' && isConfigValid) {
       console.error("[Firebase] CRITICAL ERROR during initialization:", e);
       isFirebaseInitialized = false;
   }
-} else if (!isConfigValid) {
+} else if (typeof window !== 'undefined' && !isConfigValid) {
     console.error("[Firebase] CONFIG IS MISSING OR INVALID. Check your .env.local file and RESTART the server.");
 }
 
