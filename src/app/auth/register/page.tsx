@@ -8,7 +8,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createUserWithEmailAndPassword, updateProfile } from "firebase/auth";
 import { doc, setDoc } from "firebase/firestore"; 
-import { auth, db } from "@/lib/firebase"; 
+import { auth, db, isFirebaseInitialized } from "@/lib/firebase"; 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
@@ -46,10 +46,13 @@ export default function RegisterPage() {
     setIsLoading(true);
     setError(null);
 
+    if (!isFirebaseInitialized) {
+      setError("Firebase configuration is invalid. Please check your `.env.local` file and restart the development server.");
+      setIsLoading(false);
+      return;
+    }
+
     try {
-      if (!auth || !db) {
-        throw new Error("auth/configuration-not-found");
-      }
       const userCredential = await createUserWithEmailAndPassword(auth, data.email, data.password);
       const user = userCredential.user;
 
@@ -70,9 +73,7 @@ export default function RegisterPage() {
       router.push("/dashboard");
     } catch (error: any) {
       console.error("Registration error", error);
-       if (error.code === 'auth/configuration-not-found' || error.message === 'auth/configuration-not-found') {
-        setError("Firebase configuration is invalid. Please check your `.env.local` file and restart the development server.");
-      } else if (error.code === 'auth/email-already-in-use') {
+      if (error.code === 'auth/email-already-in-use') {
           setError("This email address is already in use. Please try another one or log in.");
       } else {
           setError("An unexpected error occurred. Please try again.");

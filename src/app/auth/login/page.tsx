@@ -7,7 +7,7 @@ import * as z from "zod";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { signInWithEmailAndPassword } from "firebase/auth"; 
-import { auth } from "@/lib/firebase"; 
+import { auth, isFirebaseInitialized } from "@/lib/firebase"; 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
@@ -43,10 +43,13 @@ export default function LoginPage() {
     setIsLoading(true);
     setError(null);
     
+    if (!isFirebaseInitialized) {
+      setError("Firebase configuration is invalid. Please check your `.env.local` file and restart the development server.");
+      setIsLoading(false);
+      return;
+    }
+
     try {
-      if (!auth) {
-        throw new Error("auth/configuration-not-found");
-      }
       await signInWithEmailAndPassword(auth, data.email, data.password);
       toast({
         title: "Login Successful",
@@ -55,9 +58,7 @@ export default function LoginPage() {
       router.push("/dashboard");
     } catch (error: any) {
       console.error("Login error", error);
-      if (error.code === 'auth/configuration-not-found' || error.message === 'auth/configuration-not-found') {
-          setError("Firebase configuration is invalid. Please check your `.env.local` file and restart the development server.");
-      } else if (error.code === 'auth/invalid-credential' || error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password') {
+      if (error.code === 'auth/invalid-credential' || error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password') {
           setError("Invalid email or password. Please check your credentials and try again.");
       } else {
         setError("An unexpected error occurred. Please try again.");
