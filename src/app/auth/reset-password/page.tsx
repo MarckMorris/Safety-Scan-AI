@@ -26,6 +26,7 @@ export default function ResetPasswordPage() {
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
   const [emailSent, setEmailSent] = useState(false);
+  const [isConfigError, setIsConfigError] = useState(!isFirebaseInitialized);
 
   const form = useForm<ResetPasswordFormValues>({
     resolver: zodResolver(resetPasswordSchema),
@@ -37,12 +38,8 @@ export default function ResetPasswordPage() {
   const onSubmit = async (data: ResetPasswordFormValues) => {
     setIsLoading(true);
 
-    if (!isFirebaseInitialized || !auth) {
-        toast({
-            title: "Configuration Error",
-            description: "Firebase is not configured correctly. Check the on-page message.",
-            variant: "destructive",
-        });
+    if (!auth) {
+        setIsConfigError(true);
         setIsLoading(false);
         return;
     }
@@ -58,6 +55,10 @@ export default function ResetPasswordPage() {
     {
       console.error("Password reset error", error);
       let description = "An unexpected error occurred. Please try again.";
+      if (error.code === 'auth/configuration-not-found') {
+        setIsConfigError(true);
+        return; // Stop execution and show the config error alert
+      }
       if (error.code) {
           description = error.message;
       }
@@ -87,12 +88,12 @@ export default function ResetPasswordPage() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          {!isFirebaseInitialized ? (
+          {isConfigError ? (
             <Alert variant="destructive" className="mb-6">
               <AlertTriangle className="h-4 w-4" />
               <AlertTitle>Critical Configuration Error</AlertTitle>
               <AlertDescription>
-                The application cannot connect to the backend. Please check your server's startup logs in the terminal for detailed diagnostic information about your `.env.local` file, then restart the server.
+                The application cannot connect to the backend. Please check your `.env.local` file for correct Firebase keys and **restart your development server**.
               </AlertDescription>
             </Alert>
           ) : !emailSent ? (

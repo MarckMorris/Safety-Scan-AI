@@ -31,6 +31,7 @@ export default function RegisterPage() {
   const router = useRouter();
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
+  const [isConfigError, setIsConfigError] = useState(!isFirebaseInitialized);
 
   const form = useForm<RegisterFormValues>({
     resolver: zodResolver(registerSchema),
@@ -44,12 +45,8 @@ export default function RegisterPage() {
   const onSubmit = async (data: RegisterFormValues) => {
     setIsLoading(true);
 
-    if (!isFirebaseInitialized || !auth || !db) {
-        toast({
-            title: "Configuration Error",
-            description: "Firebase is not configured correctly. Check the on-page message.",
-            variant: "destructive",
-        });
+    if (!auth || !db) {
+        setIsConfigError(true);
         setIsLoading(false);
         return;
     }
@@ -77,6 +74,10 @@ export default function RegisterPage() {
       console.error("Registration error", error);
       let description = "An unexpected error occurred. Please try again.";
       
+      if (error.code === 'auth/configuration-not-found') {
+        setIsConfigError(true);
+        return; // Stop execution and show the config error alert
+      }
       if (error.code === 'auth/email-already-in-use') {
           description = "This email address is already in use. Please try another one or log in.";
       } else if (error.code) {
@@ -105,12 +106,12 @@ export default function RegisterPage() {
           <CardDescription>Join Safety Scan AI to start securing your applications.</CardDescription>
         </CardHeader>
         <CardContent>
-          {!isFirebaseInitialized ? (
+          {isConfigError ? (
             <Alert variant="destructive" className="mb-6">
               <AlertTriangle className="h-4 w-4" />
               <AlertTitle>Critical Configuration Error</AlertTitle>
               <AlertDescription>
-                The application cannot connect to the backend. Please check your server's startup logs in the terminal for detailed diagnostic information about your `.env.local` file, then restart the server.
+                The application cannot connect to the backend. Please check your `.env.local` file for correct Firebase keys and **restart your development server**.
               </AlertDescription>
             </Alert>
           ) : (
