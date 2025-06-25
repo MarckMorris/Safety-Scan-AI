@@ -12,8 +12,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
-import { ShieldAlert, AlertTriangle } from "lucide-react"; 
-import { useState } from "react";
+import { ShieldAlert, AlertTriangle, Loader2 } from "lucide-react"; 
+import { useState, useEffect } from "react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"; 
 
 const resetPasswordSchema = z.object({
@@ -27,6 +27,11 @@ export default function ResetPasswordPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [emailSent, setEmailSent] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isClient, setIsClient] = useState(false);
+
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
 
 
   const form = useForm<ResetPasswordFormValues>({
@@ -42,7 +47,8 @@ export default function ResetPasswordPage() {
     setEmailSent(false);
 
     try {
-      await sendPasswordResetEmail(auth!, data.email);
+      if (!auth) throw new Error("Firebase is not initialized. Please check your configuration.");
+      await sendPasswordResetEmail(auth, data.email);
       toast({
         title: "Password Reset Email Sent",
         description: "Please check your inbox for instructions to reset your password.",
@@ -60,6 +66,14 @@ export default function ResetPasswordPage() {
       setIsLoading(false);
     }
   };
+
+  if (!isClient) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-background to-secondary/30">
+        <Loader2 className="h-12 w-12 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   if (!isFirebaseInitialized) {
     return (

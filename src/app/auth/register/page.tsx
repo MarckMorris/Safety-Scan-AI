@@ -15,8 +15,8 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import type { UserProfile } from "@/types"; 
-import { ShieldAlert, AlertTriangle } from "lucide-react"; 
-import { useState } from "react";
+import { ShieldAlert, AlertTriangle, Loader2 } from "lucide-react"; 
+import { useState, useEffect } from "react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"; 
 
 const registerSchema = z.object({
@@ -32,6 +32,11 @@ export default function RegisterPage() {
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isClient, setIsClient] = useState(false);
+
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
 
   const form = useForm<RegisterFormValues>({
     resolver: zodResolver(registerSchema),
@@ -47,7 +52,8 @@ export default function RegisterPage() {
     setError(null);
 
     try {
-      const userCredential = await createUserWithEmailAndPassword(auth!, data.email, data.password);
+      if (!auth || !db) throw new Error("Firebase is not initialized. Please check your configuration.");
+      const userCredential = await createUserWithEmailAndPassword(auth, data.email, data.password);
       const user = userCredential.user;
 
       await updateProfile(user, { displayName: data.displayName }); 
@@ -58,7 +64,7 @@ export default function RegisterPage() {
         displayName: data.displayName,
         role: 'user', 
       };
-      await setDoc(doc(db!, "users", user.uid), userProfileData);
+      await setDoc(doc(db, "users", user.uid), userProfileData);
 
       toast({
         title: "Registration Successful",
@@ -78,6 +84,14 @@ export default function RegisterPage() {
       setIsLoading(false);
     }
   };
+
+  if (!isClient) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-background to-secondary/30">
+        <Loader2 className="h-12 w-12 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   if (!isFirebaseInitialized) {
     return (

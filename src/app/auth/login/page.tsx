@@ -13,8 +13,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
-import { ShieldAlert, AlertTriangle } from "lucide-react"; 
-import { useState } from "react";
+import { ShieldAlert, AlertTriangle, Loader2 } from "lucide-react"; 
+import { useState, useEffect } from "react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"; 
 
 
@@ -30,6 +30,11 @@ export default function LoginPage() {
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isClient, setIsClient] = useState(false);
+
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
 
   const form = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
@@ -44,7 +49,8 @@ export default function LoginPage() {
     setError(null);
     
     try {
-      await signInWithEmailAndPassword(auth!, data.email, data.password);
+      if (!auth) throw new Error("Firebase is not initialized. Please check your configuration.");
+      await signInWithEmailAndPassword(auth, data.email, data.password);
       toast({
         title: "Login Successful",
         description: "Welcome back!",
@@ -63,6 +69,14 @@ export default function LoginPage() {
       setIsLoading(false);
     }
   };
+
+  if (!isClient) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-background to-secondary/30">
+        <Loader2 className="h-12 w-12 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   if (!isFirebaseInitialized) {
     return (
