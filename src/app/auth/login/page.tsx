@@ -59,7 +59,9 @@ export default function LoginPage() {
     } catch (error: any) {
       console.error("Login error", error);
       let description = "An unexpected error occurred. Please try again.";
-      if (error.code === 'auth/invalid-credential') {
+      if (error.code === 'auth/configuration-not-found') {
+        description = "Configuration Error: The app cannot connect to Firebase. Double-check that your .env.local file has the correct Firebase keys and that you have restarted the development server.";
+      } else if (error.code === 'auth/invalid-credential') {
           description = "Invalid email or password. Please check your credentials and try again.";
       } else if (error.code) {
           description = error.message;
