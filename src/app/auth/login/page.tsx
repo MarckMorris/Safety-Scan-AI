@@ -80,32 +80,6 @@ export default function LoginPage() {
     );
   }
 
-  if (!isFirebaseInitialized) {
-    return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-background to-secondary/30 py-12 px-4 sm:px-6 lg:px-8">
-         <Link href="/" className="flex items-center space-x-2 mb-8">
-            <ShieldAlert className="h-10 w-10 text-primary" />
-            <span className="font-bold text-3xl font-headline">Safety Scan AI</span>
-          </Link>
-        <Card className="w-full max-w-md shadow-2xl">
-          <CardHeader>
-            <CardTitle>Configuration Error</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <Alert variant="destructive">
-                <AlertTriangle className="h-4 w-4" />
-                <AlertTitle>Critical Configuration Error</AlertTitle>
-                <AlertDescription>
-                    The application cannot connect to the backend. Please check your `.env.local` file for correct Firebase keys and **restart your development server**.
-                </AlertDescription>
-            </Alert>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
-
-
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-background to-secondary/30 py-12 px-4 sm:px-6 lg:px-8">
        <Link href="/" className="flex items-center space-x-2 mb-8">
