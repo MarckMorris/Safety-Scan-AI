@@ -6,14 +6,14 @@ import { useForm } from "react-hook-form";
 import * as z from "zod";
 import Link from "next/link";
 import { sendPasswordResetEmail } from "firebase/auth"; 
-import { auth, isFirebaseInitialized } from "@/lib/firebase"; 
+import { auth } from "@/lib/firebase"; 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { ShieldAlert, AlertTriangle, Loader2 } from "lucide-react"; 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"; 
 
 const resetPasswordSchema = z.object({
@@ -27,16 +27,6 @@ export default function ResetPasswordPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [emailSent, setEmailSent] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [isClient, setIsClient] = useState(false);
-  const [isConfigError, setIsConfigError] = useState(false);
-
-  useEffect(() => {
-    setIsClient(true);
-    if (!isFirebaseInitialized) {
-      setIsConfigError(true);
-    }
-  }, []);
-
 
   const form = useForm<ResetPasswordFormValues>({
     resolver: zodResolver(resetPasswordSchema),
@@ -51,6 +41,9 @@ export default function ResetPasswordPage() {
     setEmailSent(false);
 
     try {
+      if (!auth) {
+        throw new Error("Firebase is not initialized. Please check your configuration.");
+      }
       await sendPasswordResetEmail(auth, data.email);
       toast({
         title: "Password Reset Email Sent",
@@ -60,12 +53,10 @@ export default function ResetPasswordPage() {
     } catch (error: any)
     {
       console.error("Password reset error", error);
-      if (error.code === 'auth/configuration-not-found') {
-        setIsConfigError(true);
-        return;
-      }
       let description = "An unexpected error occurred. Please try again.";
-      if (error.message) {
+      if (error.code === 'auth/configuration-not-found') {
+        description = "Critical Configuration Error: The application cannot connect to the backend. Please check your .env.local file for correct Firebase keys and restart your development server.";
+      } else if (error.message) {
           description = error.message;
       }
       setError(description);
@@ -74,14 +65,6 @@ export default function ResetPasswordPage() {
     }
   };
 
-  if (!isClient) {
-    return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-background to-secondary/30">
-        <Loader2 className="h-12 w-12 animate-spin text-primary" />
-      </div>
-    );
-  }
-
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-background to-secondary/30 py-12 px-4 sm:px-6 lg:px-8">
       <Link href="/" className="flex items-center space-x-2 mb-8">
@@ -89,22 +72,6 @@ export default function ResetPasswordPage() {
         <span className="font-bold text-3xl font-headline">Safety Scan AI</span>
       </Link>
       
-      {isConfigError ? (
-        <Card className="w-full max-w-md shadow-2xl">
-            <CardHeader>
-                <CardTitle className="text-2xl font-headline text-center">Configuration Error</CardTitle>
-            </CardHeader>
-            <CardContent>
-                <Alert variant="destructive">
-                    <AlertTriangle className="h-4 w-4" />
-                    <AlertTitle>Critical Configuration Error</AlertTitle>
-                    <AlertDescription>
-                        The application cannot connect to the backend. Please check your <code>.env.local</code> file for correct Firebase keys and <strong>restart your development server</strong>.
-                    </AlertDescription>
-                </Alert>
-            </CardContent>
-        </Card>
-      ) : (
         <Card className="w-full max-w-md shadow-2xl">
           <CardHeader className="text-center">
             <CardTitle className="text-2xl font-headline">Reset Your Password</CardTitle>
@@ -156,7 +123,6 @@ export default function ResetPasswordPage() {
             </div>
           </CardContent>
         </Card>
-      )}
     </div>
   );
 }

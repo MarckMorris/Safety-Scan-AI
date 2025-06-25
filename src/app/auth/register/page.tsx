@@ -8,7 +8,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createUserWithEmailAndPassword, updateProfile } from "firebase/auth";
 import { doc, setDoc } from "firebase/firestore"; 
-import { auth, db, isFirebaseInitialized } from "@/lib/firebase"; 
+import { auth, db } from "@/lib/firebase"; 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
@@ -16,7 +16,7 @@ import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import type { UserProfile } from "@/types"; 
 import { ShieldAlert, AlertTriangle, Loader2 } from "lucide-react"; 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"; 
 
 const registerSchema = z.object({
@@ -32,15 +32,6 @@ export default function RegisterPage() {
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [isClient, setIsClient] = useState(false);
-  const [isConfigError, setIsConfigError] = useState(false);
-
-  useEffect(() => {
-    setIsClient(true);
-    if (!isFirebaseInitialized) {
-      setIsConfigError(true);
-    }
-  }, []);
 
   const form = useForm<RegisterFormValues>({
     resolver: zodResolver(registerSchema),
@@ -56,6 +47,9 @@ export default function RegisterPage() {
     setError(null);
 
     try {
+      if (!auth || !db) {
+        throw new Error("Firebase is not initialized. Please check your configuration.");
+      }
       const userCredential = await createUserWithEmailAndPassword(auth, data.email, data.password);
       const user = userCredential.user;
 
@@ -76,12 +70,10 @@ export default function RegisterPage() {
       router.push("/dashboard");
     } catch (error: any) {
       console.error("Registration error", error);
-      if (error.code === 'auth/configuration-not-found') {
-        setIsConfigError(true);
-        return;
-      }
       let description = "An unexpected error occurred. Please try again.";
-      if (error.code === 'auth/email-already-in-use') {
+      if (error.code === 'auth/configuration-not-found') {
+        description = "Critical Configuration Error: The application cannot connect to the backend. Please check your .env.local file for correct Firebase keys and restart your development server.";
+      } else if (error.code === 'auth/email-already-in-use') {
           description = "This email address is already in use. Please try another one or log in.";
       } else if (error.message) {
           description = error.message;
@@ -92,14 +84,6 @@ export default function RegisterPage() {
     }
   };
 
-  if (!isClient) {
-    return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-background to-secondary/30">
-        <Loader2 className="h-12 w-12 animate-spin text-primary" />
-      </div>
-    );
-  }
-
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-background to-secondary/30 py-12 px-4 sm:px-6 lg:px-8">
       <Link href="/" className="flex items-center space-x-2 mb-8">
@@ -107,22 +91,6 @@ export default function RegisterPage() {
         <span className="font-bold text-3xl font-headline">Safety Scan AI</span>
       </Link>
       
-      {isConfigError ? (
-          <Card className="w-full max-w-md shadow-2xl">
-              <CardHeader>
-                  <CardTitle className="text-2xl font-headline text-center">Configuration Error</CardTitle>
-              </CardHeader>
-              <CardContent>
-                  <Alert variant="destructive">
-                      <AlertTriangle className="h-4 w-4" />
-                      <AlertTitle>Critical Configuration Error</AlertTitle>
-                      <AlertDescription>
-                          The application cannot connect to the backend. Please check your <code>.env.local</code> file for correct Firebase keys and <strong>restart your development server</strong>.
-                      </AlertDescription>
-                  </Alert>
-              </CardContent>
-          </Card>
-      ) : (
         <Card className="w-full max-w-md shadow-2xl">
           <CardHeader className="text-center">
             <CardTitle className="text-2xl font-headline">Create an Account</CardTitle>
@@ -190,7 +158,6 @@ export default function RegisterPage() {
               </div>
           </CardContent>
         </Card>
-      )}
     </div>
   );
 }
