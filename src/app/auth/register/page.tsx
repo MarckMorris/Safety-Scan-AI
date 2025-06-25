@@ -33,11 +33,13 @@ export default function RegisterPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isClient, setIsClient] = useState(false);
-  const [firebaseReady, setFirebaseReady] = useState(false);
+  const [isConfigError, setIsConfigError] = useState(false);
 
   useEffect(() => {
     setIsClient(true);
-    setFirebaseReady(isFirebaseInitialized);
+    if (!isFirebaseInitialized) {
+      setIsConfigError(true);
+    }
   }, []);
 
   const form = useForm<RegisterFormValues>({
@@ -74,6 +76,10 @@ export default function RegisterPage() {
       router.push("/dashboard");
     } catch (error: any) {
       console.error("Registration error", error);
+      if (error.code === 'auth/configuration-not-found') {
+        setIsConfigError(true);
+        return;
+      }
       let description = "An unexpected error occurred. Please try again.";
       if (error.code === 'auth/email-already-in-use') {
           description = "This email address is already in use. Please try another one or log in.";
@@ -94,13 +100,14 @@ export default function RegisterPage() {
     );
   }
 
-  if (!firebaseReady) {
-    return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-background to-secondary/30 py-12 px-4 sm:px-6 lg:px-8">
-          <Link href="/" className="flex items-center space-x-2 mb-8">
-              <ShieldAlert className="h-10 w-10 text-primary" />
-              <span className="font-bold text-3xl font-headline">Safety Scan AI</span>
-          </Link>
+  return (
+    <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-background to-secondary/30 py-12 px-4 sm:px-6 lg:px-8">
+      <Link href="/" className="flex items-center space-x-2 mb-8">
+        <ShieldAlert className="h-10 w-10 text-primary" />
+        <span className="font-bold text-3xl font-headline">Safety Scan AI</span>
+      </Link>
+      
+      {isConfigError ? (
           <Card className="w-full max-w-md shadow-2xl">
               <CardHeader>
                   <CardTitle className="text-2xl font-headline text-center">Configuration Error</CardTitle>
@@ -115,83 +122,75 @@ export default function RegisterPage() {
                   </Alert>
               </CardContent>
           </Card>
-      </div>
-    );
-  }
-
-  return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-background to-secondary/30 py-12 px-4 sm:px-6 lg:px-8">
-      <Link href="/" className="flex items-center space-x-2 mb-8">
-        <ShieldAlert className="h-10 w-10 text-primary" />
-        <span className="font-bold text-3xl font-headline">Safety Scan AI</span>
-      </Link>
-      <Card className="w-full max-w-md shadow-2xl">
-        <CardHeader className="text-center">
-          <CardTitle className="text-2xl font-headline">Create an Account</CardTitle>
-          <CardDescription>Join Safety Scan AI to start securing your applications.</CardDescription>
-        </CardHeader>
-        <CardContent>
-            {error && (
-                <Alert variant="destructive" className="mb-6">
-                    <AlertTriangle className="h-4 w-4" />
-                    <AlertTitle>Registration Failed</AlertTitle>
-                    <AlertDescription>{error}</AlertDescription>
-                </Alert>
-            )}
-            <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-                <FormField
-                control={form.control}
-                name="displayName"
-                render={({ field }) => (
-                    <FormItem>
-                    <FormLabel>Display Name</FormLabel>
-                    <FormControl>
-                        <Input placeholder="Your Name" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                    </FormItem>
-                )}
-                />
-                <FormField
-                control={form.control}
-                name="email"
-                render={({ field }) => (
-                    <FormItem>
-                    <FormLabel>Email Address</FormLabel>
-                    <FormControl>
-                        <Input type="email" placeholder="you@example.com" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                    </FormItem>
-                )}
-                />
-                <FormField
-                control={form.control}
-                name="password"
-                render={({ field }) => (
-                    <FormItem>
-                    <FormLabel>Password</FormLabel>
-                    <FormControl>
-                        <Input type="password" placeholder="••••••••" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                    </FormItem>
-                )}
-                />
-                <Button type="submit" className="w-full" disabled={isLoading}>
-                {isLoading ? <><Loader2 className="h-4 w-4 animate-spin mr-2" />Creating Account...</> : "Create Account"}
-                </Button>
-            </form>
-            </Form>
-            <div className="mt-6 text-center text-sm">
-            Already have an account?{" "}
-            <Link href="/auth/login" passHref>
-                <Button variant="link" type="button" className="p-0 h-auto font-normal">Sign in</Button>
-            </Link>
-            </div>
-        </CardContent>
-      </Card>
+      ) : (
+        <Card className="w-full max-w-md shadow-2xl">
+          <CardHeader className="text-center">
+            <CardTitle className="text-2xl font-headline">Create an Account</CardTitle>
+            <CardDescription>Join Safety Scan AI to start securing your applications.</CardDescription>
+          </CardHeader>
+          <CardContent>
+              {error && (
+                  <Alert variant="destructive" className="mb-6">
+                      <AlertTriangle className="h-4 w-4" />
+                      <AlertTitle>Registration Failed</AlertTitle>
+                      <AlertDescription>{error}</AlertDescription>
+                  </Alert>
+              )}
+              <Form {...form}>
+              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+                  <FormField
+                  control={form.control}
+                  name="displayName"
+                  render={({ field }) => (
+                      <FormItem>
+                      <FormLabel>Display Name</FormLabel>
+                      <FormControl>
+                          <Input placeholder="Your Name" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                      </FormItem>
+                  )}
+                  />
+                  <FormField
+                  control={form.control}
+                  name="email"
+                  render={({ field }) => (
+                      <FormItem>
+                      <FormLabel>Email Address</FormLabel>
+                      <FormControl>
+                          <Input type="email" placeholder="you@example.com" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                      </FormItem>
+                  )}
+                  />
+                  <FormField
+                  control={form.control}
+                  name="password"
+                  render={({ field }) => (
+                      <FormItem>
+                      <FormLabel>Password</FormLabel>
+                      <FormControl>
+                          <Input type="password" placeholder="••••••••" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                      </FormItem>
+                  )}
+                  />
+                  <Button type="submit" className="w-full" disabled={isLoading}>
+                  {isLoading ? <><Loader2 className="h-4 w-4 animate-spin mr-2" />Creating Account...</> : "Create Account"}
+                  </Button>
+              </form>
+              </Form>
+              <div className="mt-6 text-center text-sm">
+              Already have an account?{" "}
+              <Link href="/auth/login" passHref>
+                  <Button variant="link" type="button" className="p-0 h-auto font-normal">Sign in</Button>
+              </Link>
+              </div>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }

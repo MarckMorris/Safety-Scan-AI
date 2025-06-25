@@ -28,11 +28,13 @@ export default function ResetPasswordPage() {
   const [emailSent, setEmailSent] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isClient, setIsClient] = useState(false);
-  const [firebaseReady, setFirebaseReady] = useState(false);
+  const [isConfigError, setIsConfigError] = useState(false);
 
   useEffect(() => {
     setIsClient(true);
-    setFirebaseReady(isFirebaseInitialized);
+    if (!isFirebaseInitialized) {
+      setIsConfigError(true);
+    }
   }, []);
 
 
@@ -58,6 +60,10 @@ export default function ResetPasswordPage() {
     } catch (error: any)
     {
       console.error("Password reset error", error);
+      if (error.code === 'auth/configuration-not-found') {
+        setIsConfigError(true);
+        return;
+      }
       let description = "An unexpected error occurred. Please try again.";
       if (error.message) {
           description = error.message;
@@ -76,88 +82,81 @@ export default function ResetPasswordPage() {
     );
   }
 
-  if (!firebaseReady) {
-    return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-background to-secondary/30 py-12 px-4 sm:px-6 lg:px-8">
-          <Link href="/" className="flex items-center space-x-2 mb-8">
-              <ShieldAlert className="h-10 w-10 text-primary" />
-              <span className="font-bold text-3xl font-headline">Safety Scan AI</span>
-          </Link>
-          <Card className="w-full max-w-md shadow-2xl">
-              <CardHeader>
-                  <CardTitle className="text-2xl font-headline text-center">Configuration Error</CardTitle>
-              </CardHeader>
-              <CardContent>
-                  <Alert variant="destructive">
-                      <AlertTriangle className="h-4 w-4" />
-                      <AlertTitle>Critical Configuration Error</AlertTitle>
-                      <AlertDescription>
-                          The application cannot connect to the backend. Please check your <code>.env.local</code> file for correct Firebase keys and <strong>restart your development server</strong>.
-                      </AlertDescription>
-                  </Alert>
-              </CardContent>
-          </Card>
-      </div>
-    );
-  }
-
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-background to-secondary/30 py-12 px-4 sm:px-6 lg:px-8">
       <Link href="/" className="flex items-center space-x-2 mb-8">
         <ShieldAlert className="h-10 w-10 text-primary" />
         <span className="font-bold text-3xl font-headline">Safety Scan AI</span>
       </Link>
-      <Card className="w-full max-w-md shadow-2xl">
-        <CardHeader className="text-center">
-          <CardTitle className="text-2xl font-headline">Reset Your Password</CardTitle>
-          <CardDescription>
-            {emailSent 
-              ? "Check your email for the reset link." 
-              : "Enter your email address and we&apos;ll send you a link to reset your password."}
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          {error && (
-              <Alert variant="destructive" className="mb-6">
-                  <AlertTriangle className="h-4 w-4" />
-                  <AlertTitle>Request Failed</AlertTitle>
-                  <AlertDescription>{error}</AlertDescription>
-              </Alert>
-          )}
-          {!emailSent ? (
-            <Form {...form}>
-              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-                <FormField
-                  control={form.control}
-                  name="email"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Email Address</FormLabel>
-                      <FormControl>
-                        <Input type="email" placeholder="you@example.com" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <Button type="submit" className="w-full" disabled={isLoading}>
-                  {isLoading ? <><Loader2 className="h-4 w-4 animate-spin mr-2" />Sending...</> : "Send Reset Link"}
-                </Button>
-              </form>
-            </Form>
-          ) : (
-             <div className="text-center">
-                <p className="text-green-600">A password reset link has been sent to your email address.</p>
-             </div>
-          )}
-          <div className="mt-6 text-center text-sm">
-            Remember your password?{" "}
-            <Link href="/auth/login" passHref>
-               <Button variant="link" type="button" className="p-0 h-auto font-normal">Sign in</Button>
-            </Link>
-          </div>
-        </CardContent>
-      </Card>
+      
+      {isConfigError ? (
+        <Card className="w-full max-w-md shadow-2xl">
+            <CardHeader>
+                <CardTitle className="text-2xl font-headline text-center">Configuration Error</CardTitle>
+            </CardHeader>
+            <CardContent>
+                <Alert variant="destructive">
+                    <AlertTriangle className="h-4 w-4" />
+                    <AlertTitle>Critical Configuration Error</AlertTitle>
+                    <AlertDescription>
+                        The application cannot connect to the backend. Please check your <code>.env.local</code> file for correct Firebase keys and <strong>restart your development server</strong>.
+                    </AlertDescription>
+                </Alert>
+            </CardContent>
+        </Card>
+      ) : (
+        <Card className="w-full max-w-md shadow-2xl">
+          <CardHeader className="text-center">
+            <CardTitle className="text-2xl font-headline">Reset Your Password</CardTitle>
+            <CardDescription>
+              {emailSent 
+                ? "Check your email for the reset link." 
+                : "Enter your email address and we&apos;ll send you a link to reset your password."}
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {error && (
+                <Alert variant="destructive" className="mb-6">
+                    <AlertTriangle className="h-4 w-4" />
+                    <AlertTitle>Request Failed</AlertTitle>
+                    <AlertDescription>{error}</AlertDescription>
+                </Alert>
+            )}
+            {!emailSent ? (
+              <Form {...form}>
+                <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+                  <FormField
+                    control={form.control}
+                    name="email"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Email Address</FormLabel>
+                        <FormControl>
+                          <Input type="email" placeholder="you@example.com" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <Button type="submit" className="w-full" disabled={isLoading}>
+                    {isLoading ? <><Loader2 className="h-4 w-4 animate-spin mr-2" />Sending...</> : "Send Reset Link"}
+                  </Button>
+                </form>
+              </Form>
+            ) : (
+               <div className="text-center">
+                  <p className="text-green-600">A password reset link has been sent to your email address.</p>
+               </div>
+            )}
+            <div className="mt-6 text-center text-sm">
+              Remember your password?{" "}
+              <Link href="/auth/login" passHref>
+                 <Button variant="link" type="button" className="p-0 h-auto font-normal">Sign in</Button>
+              </Link>
+            </div>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }
