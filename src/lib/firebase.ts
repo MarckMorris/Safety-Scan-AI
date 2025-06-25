@@ -1,3 +1,4 @@
+
 import { initializeApp, getApps, type FirebaseApp } from 'firebase/app';
 import { getAuth, type Auth } from 'firebase/auth';
 import { getFirestore, type Firestore } from 'firebase/firestore';
@@ -33,6 +34,9 @@ if (isConfigValid) {
   db = getFirestore(app);
   storage = getStorage(app);
   
+  /*
+  // Temporarily commented out for debugging.
+  // This section initializes Firebase App Check with reCAPTCHA v3.
   if (typeof window !== "undefined") {
     const recaptchaSiteKey = process.env.NEXT_PUBLIC_RECAPTCHA_V3_SITE_KEY;
     if (recaptchaSiteKey && !recaptchaSiteKey.includes("YOUR")) {
@@ -46,6 +50,7 @@ if (isConfigValid) {
         }
     }
   }
+  */
 } else {
     console.error("Firebase configuration is invalid. Please check your .env.local file and restart the server.");
 }
