@@ -15,7 +15,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../ui
 import { Loader2 } from "lucide-react";
 
 const scanFormSchema = z.object({
-  url: z.string().url({ message: "Please enter a valid URL (e.g., https://example.com)." }),
+  url: z.string().trim().url({ message: "Please enter a valid URL (e.g., https://example.com). Remove any leading/trailing spaces." }),
 });
 
 type ScanFormValues = z.infer<typeof scanFormSchema>;

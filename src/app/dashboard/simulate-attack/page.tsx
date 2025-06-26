@@ -20,7 +20,7 @@ type AttackType = "sqli" | "xss" | "brute-force" | "header-spoofing" | "rate-lim
 type SimulationResult = SimulateAttackOutput;
 
 const simulationFormSchema = z.object({
-  targetUrl: z.string().url({ message: "Please enter a single, valid URL." }),
+  targetUrl: z.string().trim().url({ message: "Please enter a single, valid URL without leading/trailing spaces." }),
   attackType: z.enum(["sqli", "xss", "brute-force", "header-spoofing", "rate-limiting"], {
     required_error: "You need to select an attack type.",
   }),
