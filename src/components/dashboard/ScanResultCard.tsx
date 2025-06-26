@@ -69,19 +69,31 @@ export default function ScanResultCard({ scan }: ScanResultCardProps) {
             </Badge>
         </div>
       </CardHeader>
-      <CardContent className="flex-grow flex items-center">
+      <CardContent className="flex-grow py-4">
         {scan.status === "completed" && scan.aiScanResult ? (
             vulnerabilityCount > 0 ? (
-                <div className="space-y-3">
-                    <p className="text-sm text-muted-foreground">
+                <div>
+                    <p className="text-sm text-muted-foreground mb-3">
                         Found <span className="font-bold text-foreground">{vulnerabilityCount}</span> potential {vulnerabilityCount === 1 ? 'vulnerability' : 'vulnerabilities'}.
                     </p>
-                    <div className="flex flex-wrap gap-2">
-                        {criticalVulnerabilities > 0 && <Badge variant="destructive">Critical: {criticalVulnerabilities}</Badge>}
-                        {highVulnerabilities > 0 && <Badge variant="outline" className="border-orange-500 text-orange-500">High: {highVulnerabilities}</Badge>}
-                        {mediumVulnerabilities > 0 && <Badge variant="outline" className="border-yellow-500 text-yellow-500">Medium: {mediumVulnerabilities}</Badge>}
-                        {lowVulnerabilities > 0 && <Badge variant="outline" className="border-green-500 text-green-500">Low: {lowVulnerabilities}</Badge>}
-                    </div>
+                    <ul className="space-y-1 text-sm">
+                        <li className="flex justify-between items-center">
+                            <span className="font-medium text-destructive">Critical</span>
+                            <Badge variant={criticalVulnerabilities > 0 ? "destructive" : "outline"} className="px-2 font-mono">{criticalVulnerabilities}</Badge>
+                        </li>
+                        <li className="flex justify-between items-center">
+                            <span className="font-medium text-orange-500">High</span>
+                            <Badge variant={highVulnerabilities > 0 ? "outline" : "outline"} className={`${highVulnerabilities > 0 ? 'border-orange-500 text-orange-500' : ''} px-2 font-mono`}>{highVulnerabilities}</Badge>
+                        </li>
+                        <li className="flex justify-between items-center">
+                            <span className="font-medium text-yellow-500">Medium</span>
+                            <Badge variant={mediumVulnerabilities > 0 ? "outline" : "outline"} className={`${mediumVulnerabilities > 0 ? 'border-yellow-500 text-yellow-500' : ''} px-2 font-mono`}>{mediumVulnerabilities}</Badge>
+                        </li>
+                        <li className="flex justify-between items-center">
+                            <span className="font-medium text-green-500">Low</span>
+                            <Badge variant={lowVulnerabilities > 0 ? "outline" : "outline"} className={`${lowVulnerabilities > 0 ? 'border-green-500 text-green-500' : ''} px-2 font-mono`}>{lowVulnerabilities}</Badge>
+                        </li>
+                    </ul>
                 </div>
             ) : (
                 <div className="flex items-center space-x-2 text-green-600">
@@ -92,7 +104,7 @@ export default function ScanResultCard({ scan }: ScanResultCardProps) {
         ) : scan.status === "failed" ? (
             <div className="flex items-start space-x-3 text-destructive">
                 <AlertTriangle className="h-5 w-5 mt-0.5 shrink-0" />
-                <div>
+                <div className="min-w-0">
                     <p className="font-semibold">Scan Failed</p>
                     <p className="text-xs line-clamp-3" title={scan.errorMessage || "Unknown error"}>
                         {scan.errorMessage || "An unknown error occurred."}
