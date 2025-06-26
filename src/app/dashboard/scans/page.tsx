@@ -3,7 +3,6 @@
 
 import { useEffect, useState, useMemo } from "react";
 import { useAuth } from "@/context/AuthContext";
-import { Timestamp } from "firebase/firestore"; // This is a type-only import from a now-removed package, it should be fine but could be removed. It's used for the mock data structure.
 import type { Scan } from "@/types";
 import ScanResultCard from "@/components/dashboard/ScanResultCard";
 import { Input } from "@/components/ui/input";
@@ -20,11 +19,11 @@ import { useToast } from "@/hooks/use-toast";
 
 
 // Mock scan data for UI testing if the user has no scans.
-export const mockScansData: Omit<Scan, 'createdAt' | 'updatedAt'> & { createdAt: Timestamp, updatedAt: Timestamp }[] = [
+export const mockScansData: Scan[] = [
   {
     id: "mock1", userId: "user-admin-01", targetUrl: "https://vulnerable-example.com", status: "completed",
-    createdAt: Timestamp.fromDate(new Date(Date.now() - 86400000 * 2)), // 2 days ago
-    updatedAt: Timestamp.fromDate(new Date(Date.now() - 86400000 * 2)),
+    createdAt: new Date(Date.now() - 86400000 * 2), // 2 days ago
+    updatedAt: new Date(Date.now() - 86400000 * 2),
     aiScanResult: {
       summary: "Mock scan found several critical issues on vulnerable-example.com.",
       vulnerabilities: [
@@ -36,20 +35,20 @@ export const mockScansData: Omit<Scan, 'createdAt' | 'updatedAt'> & { createdAt:
   },
   {
     id: "mock2", userId: "user-admin-01", targetUrl: "https://another-site.org", status: "failed",
-    createdAt: Timestamp.fromDate(new Date(Date.now() - 86400000 * 1)), // 1 day ago
-    updatedAt: Timestamp.fromDate(new Date(Date.now() - 86400000 * 1)),
+    createdAt: new Date(Date.now() - 86400000 * 1), // 1 day ago
+    updatedAt: new Date(Date.now() - 86400000 * 1),
     errorMessage: "Mock Error: Target site was unreachable during scan.",
   },
   {
     id: "mock3", userId: "user-regular-01", targetUrl: "https://secure-app.dev", status: "completed",
-    createdAt: Timestamp.fromDate(new Date()),
-    updatedAt: Timestamp.fromDate(new Date()),
+    createdAt: new Date(),
+    updatedAt: new Date(),
     aiScanResult: { summary: "Mock scan: secure-app.dev appears to be well configured.", vulnerabilities: [] },
   },
     {
     id: "mock4", userId: "user-regular-01", targetUrl: "https://api.internal.co", status: "scanning",
-    createdAt: Timestamp.fromDate(new Date(Date.now() - 3600000 * 1)), // 1 hour ago
-    updatedAt: Timestamp.fromDate(new Date(Date.now() - 3600000 * 1)),
+    createdAt: new Date(Date.now() - 3600000 * 1), // 1 hour ago
+    updatedAt: new Date(Date.now() - 3600000 * 1),
   },
 ];
 

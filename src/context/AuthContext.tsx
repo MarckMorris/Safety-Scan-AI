@@ -21,8 +21,14 @@ const mockUserDatabase: Record<string, UserProfile> = {
   "user-regular-01": { uid: "user-regular-01", email: "user@example.com", displayName: "Regular User", role: "user" },
 };
 
-// In-memory database for scans, prepopulated with mock data
-const mockScanDatabase: Scan[] = mockScansData.map(s => ({...s, createdAt: s.createdAt.toDate(), updatedAt: s.updatedAt.toDate()}));
+// In-memory database for scans, prepopulated with mock data.
+// A deep copy is made to ensure the mock data is fresh on each module load (important for dev server hot-reloading),
+// and dates are properly reconstructed.
+let mockScanDatabase: Scan[] = JSON.parse(JSON.stringify(mockScansData)).map((scan: any) => ({
+    ...scan,
+    createdAt: new Date(scan.createdAt),
+    updatedAt: new Date(scan.updatedAt),
+}));
 
 interface AuthContextType {
   user: MockUser | null;
