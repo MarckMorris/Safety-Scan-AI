@@ -6,7 +6,7 @@ import { useForm } from "react-hook-form";
 import * as z from "zod";
 import Link from "next/link";
 import { sendPasswordResetEmail } from "firebase/auth"; 
-import { auth, isFirebaseInitialized } from "@/lib/firebase"; 
+import { auth } from "@/lib/firebase"; 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
@@ -39,12 +39,6 @@ export default function ResetPasswordPage() {
     setIsLoading(true);
     setError(null);
     setEmailSent(false);
-    
-    if (!isFirebaseInitialized) {
-      setError("Firebase configuration is invalid. Please check your `.env.local` file and restart the development server.");
-      setIsLoading(false);
-      return;
-    }
 
     try {
       await sendPasswordResetEmail(auth, data.email);
@@ -55,7 +49,11 @@ export default function ResetPasswordPage() {
       setEmailSent(true);
     } catch (error: any) {
       console.error("Password reset error", error);
-      setError("An unexpected error occurred. Please try again.");
+      if (error.code === 'auth/configuration-not-found') {
+          setError("Firebase configuration is invalid. Please check your `.env.local` file and restart the development server.");
+      } else {
+        setError("An unexpected error occurred. Please try again.");
+      }
     } finally {
       setIsLoading(false);
     }
