@@ -6,16 +6,13 @@ import { useForm } from "react-hook-form";
 import * as z from "zod";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { createUserWithEmailAndPassword, updateProfile } from "firebase/auth";
-import { doc, setDoc } from "firebase/firestore"; 
-import { auth, db } from "@/lib/firebase"; 
+import { useAuth } from "@/context/AuthContext"; // Use our central auth context
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import type { UserProfile } from "@/types"; 
 import { ShieldAlert, AlertTriangle, Loader2 } from "lucide-react"; 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"; 
 import { useToast } from "@/hooks/use-toast";
 
@@ -30,6 +27,7 @@ type RegisterFormValues = z.infer<typeof registerSchema>;
 export default function RegisterPage() {
   const router = useRouter();
   const { toast } = useToast();
+  const { registerUser, user, loading: authLoading } = useAuth(); // Get the new register function
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -42,42 +40,41 @@ export default function RegisterPage() {
     },
   });
 
+  // Redirect if user is already logged in
+  useEffect(() => {
+    if (!authLoading && user) {
+      router.push("/dashboard");
+    }
+  }, [user, authLoading, router]);
+
   const onSubmit = async (data: RegisterFormValues) => {
     setIsLoading(true);
     setError(null);
 
-    try {
-      const userCredential = await createUserWithEmailAndPassword(auth, data.email, data.password);
-      const user = userCredential.user;
-
-      await updateProfile(user, { displayName: data.displayName }); 
-      
-      const userProfileData: UserProfile = { 
-        uid: user.uid,
-        email: user.email,
-        displayName: data.displayName,
-        role: 'user', 
-      };
-      await setDoc(doc(db, "users", user.uid), userProfileData);
-
+    const { error: registerError } = await registerUser(data.displayName, data.email, data.password);
+    
+    if (registerError) {
+      setError(registerError);
+    } else {
       toast({
         title: "Registration Successful",
-        description: "Welcome to Safety Scan AI!",
+        description: "Welcome to Safety Scan AI! Redirecting to your dashboard...",
       });
+      // The onAuthStateChanged listener in AuthContext will handle the redirect
+      // but we can push here for a faster perceived response.
       router.push("/dashboard");
-    } catch (error: any) {
-      console.error("Registration error", error);
-      if (error.code === 'auth/configuration-not-found') {
-          setError("Firebase configuration is invalid. Please check your `.env.local` file and restart the development server.");
-      } else if (error.code === 'auth/email-already-in-use') {
-          setError("This email address is already in use. Please try another one or log in.");
-      } else {
-          setError("An unexpected error occurred. Please try again.");
-      }
-    } finally {
-      setIsLoading(false);
     }
+    
+    setIsLoading(false);
   };
+
+  if (authLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <Loader2 className="h-10 w-10 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-background to-secondary/30 py-12 px-4 sm:px-6 lg:px-8">
@@ -108,7 +105,7 @@ export default function RegisterPage() {
                     <FormItem>
                     <FormLabel>Display Name</FormLabel>
                     <FormControl>
-                        <Input placeholder="Your Name" {...field} />
+                        <Input placeholder="Your Name" {...field} disabled={isLoading} />
                     </FormControl>
                     <FormMessage />
                     </FormItem>
@@ -121,7 +118,7 @@ export default function RegisterPage() {
                     <FormItem>
                     <FormLabel>Email Address</FormLabel>
                     <FormControl>
-                        <Input type="email" placeholder="you@example.com" {...field} />
+                        <Input type="email" placeholder="you@example.com" {...field} disabled={isLoading} />
                     </FormControl>
                     <FormMessage />
                     </FormItem>
@@ -134,7 +131,7 @@ export default function RegisterPage() {
                     <FormItem>
                     <FormLabel>Password</FormLabel>
                     <FormControl>
-                        <Input type="password" placeholder="••••••••" {...field} />
+                        <Input type="password" placeholder="••••••••" {...field} disabled={isLoading} />
                     </FormControl>
                     <FormMessage />
                     </FormItem>

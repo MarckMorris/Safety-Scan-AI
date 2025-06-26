@@ -6,21 +6,20 @@ import { useForm } from "react-hook-form";
 import * as z from "zod";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { signInWithEmailAndPassword } from "firebase/auth"; 
-import { auth } from "@/lib/firebase"; 
+import { useAuth } from "@/context/AuthContext"; // Use our central auth context
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { ShieldAlert, AlertTriangle, Loader2 } from "lucide-react"; 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"; 
 import { useToast } from "@/hooks/use-toast";
 
 
 const loginSchema = z.object({
   email: z.string().email({ message: "Invalid email address." }),
-  password: z.string().min(6, { message: "Password must be at least 6 characters." }),
+  password: z.string().min(1, { message: "Password is required." }), // Min 1 to prevent empty submission
 });
 
 type LoginFormValues = z.infer<typeof loginSchema>;
@@ -28,6 +27,7 @@ type LoginFormValues = z.infer<typeof loginSchema>;
 export default function LoginPage() {
   const router = useRouter();
   const { toast } = useToast();
+  const { signInUser, user, loading: authLoading } = useAuth(); // Get the new signIn function
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -39,30 +39,40 @@ export default function LoginPage() {
     },
   });
 
+  // Redirect if user is already logged in
+  useEffect(() => {
+    if (!authLoading && user) {
+      router.push("/dashboard");
+    }
+  }, [user, authLoading, router]);
+
   const onSubmit = async (data: LoginFormValues) => {
     setIsLoading(true);
     setError(null);
 
-    try {
-      await signInWithEmailAndPassword(auth, data.email, data.password);
-      toast({
-        title: "Login Successful",
-        description: "Welcome back!",
-      });
-      router.push("/dashboard");
-    } catch (error: any) {
-      console.error("Login error", error);
-      if (error.code === 'auth/configuration-not-found') {
-          setError("Firebase configuration is invalid. Please check your `.env.local` file and restart the development server.");
-      } else if (error.code === 'auth/invalid-credential' || error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password') {
-          setError("Invalid email or password. Please check your credentials and try again.");
-      } else {
-        setError("An unexpected error occurred. Please try again.");
-      }
-    } finally {
-      setIsLoading(false);
+    const { error: signInError } = await signInUser(data.email, data.password);
+
+    if (signInError) {
+        setError(signInError);
+    } else {
+        toast({
+            title: "Login Successful",
+            description: "Welcome back! Redirecting to your dashboard...",
+        });
+        // The onAuthStateChanged listener in AuthContext will handle the redirect
+        router.push("/dashboard");
     }
+
+    setIsLoading(false);
   };
+
+  if (authLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <Loader2 className="h-10 w-10 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-background to-secondary/30 py-12 px-4 sm:px-6 lg:px-8">
@@ -93,7 +103,7 @@ export default function LoginPage() {
                       <FormItem>
                       <FormLabel>Email Address</FormLabel>
                       <FormControl>
-                          <Input type="email" placeholder="you@example.com" {...field} />
+                          <Input type="email" placeholder="you@example.com" {...field} disabled={isLoading} />
                       </FormControl>
                       <FormMessage />
                       </FormItem>
@@ -106,7 +116,7 @@ export default function LoginPage() {
                       <FormItem>
                       <FormLabel>Password</FormLabel>
                       <FormControl>
-                          <Input type="password" placeholder="••••••••" {...field} />
+                          <Input type="password" placeholder="••••••••" {...field} disabled={isLoading} />
                       </FormControl>
                       <FormMessage />
                       </FormItem>

@@ -5,8 +5,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import * as z from "zod";
 import Link from "next/link";
-import { sendPasswordResetEmail } from "firebase/auth"; 
-import { auth } from "@/lib/firebase"; 
+import { useAuth } from "@/context/AuthContext"; // Use our central auth context
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
@@ -24,6 +23,7 @@ type ResetPasswordFormValues = z.infer<typeof resetPasswordSchema>;
 
 export default function ResetPasswordPage() {
   const { toast } = useToast();
+  const { sendPasswordReset } = useAuth(); // Get the new function
   const [isLoading, setIsLoading] = useState(false);
   const [emailSent, setEmailSent] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -40,23 +40,19 @@ export default function ResetPasswordPage() {
     setError(null);
     setEmailSent(false);
 
-    try {
-      await sendPasswordResetEmail(auth, data.email);
+    const { error: resetError } = await sendPasswordReset(data.email);
+    
+    if (resetError) {
+      setError(resetError);
+    } else {
       toast({
         title: "Password Reset Email Sent",
         description: "Please check your inbox for instructions to reset your password.",
       });
       setEmailSent(true);
-    } catch (error: any) {
-      console.error("Password reset error", error);
-      if (error.code === 'auth/configuration-not-found') {
-          setError("Firebase configuration is invalid. Please check your `.env.local` file and restart the development server.");
-      } else {
-        setError("An unexpected error occurred. Please try again.");
-      }
-    } finally {
-      setIsLoading(false);
     }
+    
+    setIsLoading(false);
   };
 
   return (
@@ -93,7 +89,7 @@ export default function ResetPasswordPage() {
                     <FormItem>
                       <FormLabel>Email Address</FormLabel>
                       <FormControl>
-                        <Input type="email" placeholder="you@example.com" {...field} />
+                        <Input type="email" placeholder="you@example.com" {...field} disabled={isLoading} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>

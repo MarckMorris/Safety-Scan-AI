@@ -3,28 +3,48 @@
 
 import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import type { User } from 'firebase/auth';
-import { onAuthStateChanged, signOut as firebaseSignOut } from 'firebase/auth';
+import { 
+  onAuthStateChanged, 
+  signOut as firebaseSignOut,
+  createUserWithEmailAndPassword,
+  signInWithEmailAndPassword,
+  sendPasswordResetEmail,
+  updateProfile
+} from 'firebase/auth';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
-import { auth, db } from '@/lib/firebase';
+import { auth, db, isFirebaseInitialized } from '@/lib/firebase'; // Import the flag
 import type { UserProfile } from '@/types';
 import { useRouter } from 'next/navigation';
 
+// Define the shape of the new functions we'll provide
 interface AuthContextType {
   user: User | null;
   userProfile: UserProfile | null;
   loading: boolean;
   logout: () => Promise<void>;
+  // New auth service functions
+  registerUser: (displayName: string, email: string, password: string) => Promise<{ error?: string }>;
+  signInUser: (email: string, password: string) => Promise<{ error?: string }>;
+  sendPasswordReset: (email: string) => Promise<{ error?: string }>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+const CONFIG_ERROR_MESSAGE = "Firebase configuration is invalid. Please check your `.env.local` file and restart the development server.";
+
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
-  const [loading, setLoading] = useState(true); // Start loading as true
+  const [loading, setLoading] = useState(true);
   const router = useRouter();
 
   useEffect(() => {
+    // This check is important for the initial load. If firebase isn't configured, we stop loading and show an unauthenticated state.
+    if (!isFirebaseInitialized) {
+      setLoading(false);
+      return;
+    }
+
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {
         setUser(firebaseUser);
@@ -33,20 +53,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         if (docSnap.exists()) {
           setUserProfile(docSnap.data() as UserProfile);
         } else {
-          // This case might happen if a user exists in Firebase Auth but not Firestore
-          // e.g. manual deletion of Firestore doc or incomplete registration.
-          // For now, we'll set a basic profile. A more robust solution might create it.
-           console.warn(`No Firestore profile found for user ${firebaseUser.uid}. This might be an incomplete registration or social auth without profile creation step.`);
-           // A default profile or null, depending on desired behavior.
-           // Setting to a default helps avoid errors in components expecting userProfile.
            const defaultProfile: UserProfile = {
              uid: firebaseUser.uid,
              email: firebaseUser.email,
              displayName: firebaseUser.displayName || 'New User',
-             role: 'user', // Default role
+             role: 'user',
            };
-           // Optionally create it in Firestore if it's missing
-           // await setDoc(userDocRef, defaultProfile);
+           await setDoc(userDocRef, defaultProfile);
            setUserProfile(defaultProfile);
         }
       } else {
@@ -60,19 +73,85 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   const logout = async () => {
+    if (!isFirebaseInitialized) return;
     try {
       await firebaseSignOut(auth);
-      // setUser(null); // onAuthStateChanged will handle this
-      // setUserProfile(null); // onAuthStateChanged will handle this
       router.push('/auth/login');
     } catch (error) {
       console.error("Error signing out: ", error);
-      // Handle logout error (e.g., show a toast)
+    }
+  };
+
+  const registerUser = async (displayName: string, email: string, password: string) => {
+    if (!isFirebaseInitialized || !auth || !db) {
+      return { error: CONFIG_ERROR_MESSAGE };
+    }
+    try {
+      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+      const user = userCredential.user;
+
+      await updateProfile(user, { displayName }); 
+      
+      const userProfileData: UserProfile = { 
+        uid: user.uid,
+        email: user.email,
+        displayName: displayName,
+        role: 'user', 
+      };
+      await setDoc(doc(db, "users", user.uid), userProfileData);
+
+      // onAuthStateChanged will handle redirect
+      return {};
+    } catch (error: any) {
+      console.error("Registration error", error);
+      if (error.code === 'auth/email-already-in-use') {
+        return { error: "This email address is already in use. Please try another one or log in." };
+      }
+      if (error.code === 'auth/configuration-not-found') {
+        return { error: CONFIG_ERROR_MESSAGE };
+      }
+      return { error: "An unexpected error occurred during registration." };
+    }
+  };
+
+  const signInUser = async (email: string, password: string) => {
+    if (!isFirebaseInitialized || !auth) {
+      return { error: CONFIG_ERROR_MESSAGE };
+    }
+    try {
+      await signInWithEmailAndPassword(auth, email, password);
+      // onAuthStateChanged will handle redirect
+      return {};
+    } catch (error: any) {
+      console.error("Login error", error);
+      if (error.code === 'auth/invalid-credential' || error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password') {
+        return { error: "Invalid email or password. Please check your credentials and try again." };
+      }
+      if (error.code === 'auth/configuration-not-found') {
+        return { error: CONFIG_ERROR_MESSAGE };
+      }
+      return { error: "An unexpected error occurred during sign-in." };
+    }
+  };
+  
+  const sendPasswordReset = async (email: string) => {
+    if (!isFirebaseInitialized || !auth) {
+      return { error: CONFIG_ERROR_MESSAGE };
+    }
+    try {
+      await sendPasswordResetEmail(auth, email);
+      return {};
+    } catch (error: any) {
+      console.error("Password reset error", error);
+       if (error.code === 'auth/configuration-not-found') {
+        return { error: CONFIG_ERROR_MESSAGE };
+      }
+      return { error: "An unexpected error occurred while sending the reset email." };
     }
   };
   
   return (
-    <AuthContext.Provider value={{ user, userProfile, loading, logout }}>
+    <AuthContext.Provider value={{ user, userProfile, loading, logout, registerUser, signInUser, sendPasswordReset }}>
       {children}
     </AuthContext.Provider>
   );
