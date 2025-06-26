@@ -31,16 +31,16 @@ const getStatusBadgeVariant = (status: Scan["status"]): "default" | "secondary" 
 const getStatusIcon = (status: Scan["status"]) => {
   switch (status) {
     case "completed":
-      return <CheckCircle className="w-4 h-4 text-green-500" />;
+      return <CheckCircle className="w-4 h-4" />;
     case "failed":
-      return <AlertTriangle className="w-4 h-4 text-destructive" />;
+      return <AlertTriangle className="w-4 h-4" />;
     case "scanning":
     case "generating_report":
-      return <Loader2 className="w-4 h-4 animate-spin text-blue-500" />;
+      return <Loader2 className="w-4 h-4 animate-spin" />;
     case "queued":
-        return <Clock className="w-4 h-4 text-muted-foreground" />;  
+        return <Clock className="w-4 h-4" />;  
     default:
-      return <Clock className="w-4 h-4 text-muted-foreground" />;
+      return <Clock className="w-4 h-4" />;
   }
 }
 
@@ -48,6 +48,8 @@ export default function ScanResultCard({ scan }: ScanResultCardProps) {
   const vulnerabilityCount = scan.aiScanResult?.vulnerabilities?.length || 0;
   const criticalVulnerabilities = scan.aiScanResult?.vulnerabilities?.filter(v => v.severity === 'Critical').length || 0;
   const highVulnerabilities = scan.aiScanResult?.vulnerabilities?.filter(v => v.severity === 'High').length || 0;
+  const mediumVulnerabilities = scan.aiScanResult?.vulnerabilities?.filter(v => v.severity === 'Medium').length || 0;
+  const lowVulnerabilities = scan.aiScanResult?.vulnerabilities?.filter(v => v.severity === 'Low').length || 0;
 
   return (
     <Card className="shadow-lg hover:shadow-xl transition-shadow duration-300 flex flex-col h-full">
@@ -61,35 +63,50 @@ export default function ScanResultCard({ scan }: ScanResultCardProps) {
                 {scan.createdAt ? `Scanned ${formatDistanceToNow(scan.createdAt, { addSuffix: true })}` : 'Scan date unavailable'}
                 </CardDescription>
             </div>
-            <Badge variant={getStatusBadgeVariant(scan.status)} className="capitalize flex items-center gap-1">
+            <Badge variant={getStatusBadgeVariant(scan.status)} className="capitalize flex items-center gap-1.5 text-xs px-2 py-1">
                 {getStatusIcon(scan.status)}
-                {scan.status.replace('_', ' ')}
+                <span>{scan.status.replace('_', ' ')}</span>
             </Badge>
         </div>
       </CardHeader>
-      <CardContent className="flex-grow space-y-3">
+      <CardContent className="flex-grow flex items-center">
         {scan.status === "completed" && scan.aiScanResult ? (
-          <>
-            <p className="text-sm text-muted-foreground line-clamp-2">
-              {scan.aiScanResult.summary}
-            </p>
-            <div className="flex justify-between text-sm pt-2">
-                <span className={vulnerabilityCount > 0 ? 'text-destructive font-semibold' : 'text-green-600 font-semibold'}>
-                    {vulnerabilityCount} {vulnerabilityCount === 1 ? 'vulnerability' : 'vulnerabilities'}
-                </span>
-                <div className="space-x-2">
-                    {criticalVulnerabilities > 0 && <Badge variant="destructive">Critical: {criticalVulnerabilities}</Badge>}
-                    {highVulnerabilities > 0 && <Badge variant="outline" className="border-orange-500 text-orange-500">High: {highVulnerabilities}</Badge>}
+            vulnerabilityCount > 0 ? (
+                <div className="space-y-3">
+                    <p className="text-sm text-muted-foreground">
+                        Found <span className="font-bold text-foreground">{vulnerabilityCount}</span> potential {vulnerabilityCount === 1 ? 'vulnerability' : 'vulnerabilities'}.
+                    </p>
+                    <div className="flex flex-wrap gap-2">
+                        {criticalVulnerabilities > 0 && <Badge variant="destructive">Critical: {criticalVulnerabilities}</Badge>}
+                        {highVulnerabilities > 0 && <Badge variant="outline" className="border-orange-500 text-orange-500">High: {highVulnerabilities}</Badge>}
+                        {mediumVulnerabilities > 0 && <Badge variant="outline" className="border-yellow-500 text-yellow-500">Medium: {mediumVulnerabilities}</Badge>}
+                        {lowVulnerabilities > 0 && <Badge variant="outline" className="border-green-500 text-green-500">Low: {lowVulnerabilities}</Badge>}
+                    </div>
+                </div>
+            ) : (
+                <div className="flex items-center space-x-2 text-green-600">
+                    <CheckCircle className="h-5 w-5" />
+                    <p className="font-semibold">No vulnerabilities found</p>
+                </div>
+            )
+        ) : scan.status === "failed" ? (
+            <div className="flex items-start space-x-3 text-destructive">
+                <AlertTriangle className="h-5 w-5 mt-0.5 shrink-0" />
+                <div>
+                    <p className="font-semibold">Scan Failed</p>
+                    <p className="text-xs line-clamp-3" title={scan.errorMessage || "Unknown error"}>
+                        {scan.errorMessage || "An unknown error occurred."}
+                    </p>
                 </div>
             </div>
-          </>
-        ) : scan.status === "failed" ? (
-            <p className="text-sm text-destructive">Scan failed: {scan.errorMessage || "Unknown error"}</p>
         ) : (
-          <p className="text-sm text-muted-foreground">Scan is currently {scan.status.replace('_', ' ')}...</p>
+            <div className="flex items-center space-x-2 text-muted-foreground">
+                <Loader2 className="h-5 w-5 animate-spin" />
+                <p>Scan in progress...</p>
+            </div>
         )}
       </CardContent>
-      <CardFooter className="border-t pt-4">
+      <CardFooter className="border-t pt-4 mt-auto">
         <Button variant="outline" asChild className="w-full">
           <Link href={`/dashboard/scans/${scan.id}?targetUrl=${encodeURIComponent(scan.targetUrl)}`}>
             View Details <ArrowRight className="ml-2 w-4 h-4" />
