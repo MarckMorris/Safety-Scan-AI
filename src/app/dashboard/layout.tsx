@@ -16,7 +16,7 @@ import {
 } from '@/components/ui/sidebar';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { ShieldAlert, ScanLine, History, UserCircle, Settings, LifeBuoy, Users, ShieldQuestion, Activity } from 'lucide-react';
+import { ShieldAlert, ScanLine, History, UserCircle, Settings, LifeBuoy, Users, ShieldQuestion, Activity, GitBranch } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/context/AuthContext';
 
@@ -24,6 +24,7 @@ const navItems = [
   { href: '/dashboard', label: 'Overview & New Scan', icon: ScanLine },
   { href: '/dashboard/scans', label: 'Scan History', icon: History },
   { href: '/dashboard/simulate-attack', label: 'Simulate Attack', icon: ShieldQuestion },
+  { href: '/dashboard/projects', label: 'DevOps Projects', icon: GitBranch },
   { href: '/dashboard/account', label: 'Account Settings', icon: UserCircle },
 ];
 

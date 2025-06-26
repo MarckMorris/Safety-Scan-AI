@@ -46,3 +46,24 @@ export interface AIPatchSuggestion {
   explanation: string;
   language?: string;
 }
+
+// Types for DevOps Module
+export interface CiCdConfig {
+  gitProvider?: "github" | "gitlab";
+  repoUrl?: string;
+  mainBranch?: string;
+  workflowPath?: string;
+  webhookSecret?: string;
+}
+
+export interface Project {
+  id: string;
+  userId: string;
+  name: string;
+  description?: string;
+  ciCdConfig?: CiCdConfig;
+  lastBuildStatus?: "UNKNOWN" | "SUCCESS" | "FAILED" | "RUNNING" | "PENDING";
+  lastDeploymentStatus?: "UNKNOWN" | "SUCCESS" | "FAILED" | "RUNNING" | "PENDING";
+  createdAt: Date;
+  updatedAt: Date;
+}
