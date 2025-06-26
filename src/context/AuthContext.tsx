@@ -118,6 +118,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         setScans(userScans);
       }, (error) => {
         console.error("Error fetching scans:", error);
+        if (error.code === 'permission-denied') {
+          setAuthError({
+              code: 'firestore-permission-denied',
+              message: "PERMISSION_DENIED: Your security rules are blocking access for the 'scans' collection. Deploy the latest Firestore rules."
+          });
+        }
       });
 
       // Listener for Projects
@@ -137,6 +143,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         setProjects(userProjects);
       }, (error) => {
         console.error("Error fetching projects:", error);
+        if (error.code === 'permission-denied') {
+          setAuthError({
+              code: 'firestore-permission-denied',
+              message: "PERMISSION_DENIED: Your security rules are blocking access for the 'projects' collection. Deploy the latest Firestore rules."
+          });
+        }
       });
 
       return () => {
