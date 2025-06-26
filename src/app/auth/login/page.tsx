@@ -6,7 +6,7 @@ import { useForm } from "react-hook-form";
 import * as z from "zod";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useAuth } from "@/context/AuthContext"; // Use our central auth context
+import { useAuth } from "@/context/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
@@ -16,10 +16,9 @@ import { useState, useEffect } from "react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"; 
 import { useToast } from "@/hooks/use-toast";
 
-
 const loginSchema = z.object({
   email: z.string().email({ message: "Invalid email address." }),
-  password: z.string().min(1, { message: "Password is required." }), // Min 1 to prevent empty submission
+  password: z.string().min(1, { message: "Password is required." }),
 });
 
 type LoginFormValues = z.infer<typeof loginSchema>;
@@ -27,15 +26,15 @@ type LoginFormValues = z.infer<typeof loginSchema>;
 export default function LoginPage() {
   const router = useRouter();
   const { toast } = useToast();
-  const { signInUser, user, loading: authLoading } = useAuth(); // Get the new signIn function
+  const { signInUser, user, loading: authLoading, isFirebaseConfigured } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const form = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
     defaultValues: {
-      email: "user@example.com",
-      password: "password",
+      email: "",
+      password: "",
     },
   });
 
@@ -59,7 +58,7 @@ export default function LoginPage() {
             title: "Login Successful",
             description: "Welcome back! Redirecting to your dashboard...",
         });
-        // The onAuthStateChanged listener in AuthContext will handle the redirect
+        // onAuthStateChanged in AuthContext will handle the redirect
         router.push("/dashboard");
     }
 
@@ -84,9 +83,19 @@ export default function LoginPage() {
         <Card className="w-full max-w-md shadow-2xl">
           <CardHeader className="text-center">
             <CardTitle className="text-2xl font-headline">Welcome Back</CardTitle>
-            <CardDescription>Sign in to access your dashboard. <br/> Use <code className="bg-muted px-1 py-0.5 rounded">user@example.com</code> or <code className="bg-muted px-1 py-0.5 rounded">admin@example.com</code>. Any password works.</CardDescription>
+            <CardDescription>Sign in to access your dashboard.</CardDescription>
           </CardHeader>
           <CardContent>
+              {!isFirebaseConfigured && (
+                  <Alert variant="destructive" className="mb-6">
+                    <AlertTriangle className="h-4 w-4" />
+                    <AlertTitle>Configuration Error</AlertTitle>
+                    <AlertDescription>
+                        Firebase is not configured. Please add your Firebase project configuration to the 
+                        <code>.env.local</code> file and restart the server.
+                    </AlertDescription>
+                  </Alert>
+              )}
               {error && (
                    <Alert variant="destructive" className="mb-6">
                       <AlertTriangle className="h-4 w-4" />
@@ -103,7 +112,7 @@ export default function LoginPage() {
                       <FormItem>
                       <FormLabel>Email Address</FormLabel>
                       <FormControl>
-                          <Input type="email" placeholder="you@example.com" {...field} disabled={isLoading} />
+                          <Input type="email" placeholder="you@example.com" {...field} disabled={isLoading || !isFirebaseConfigured} />
                       </FormControl>
                       <FormMessage />
                       </FormItem>
@@ -116,7 +125,7 @@ export default function LoginPage() {
                       <FormItem>
                       <FormLabel>Password</FormLabel>
                       <FormControl>
-                          <Input type="password" placeholder="••••••••" {...field} disabled={isLoading} />
+                          <Input type="password" placeholder="••••••••" {...field} disabled={isLoading || !isFirebaseConfigured} />
                       </FormControl>
                       <FormMessage />
                       </FormItem>
@@ -127,7 +136,7 @@ export default function LoginPage() {
                       <Button variant="link" type="button" className="p-0 h-auto font-normal">Forgot password?</Button>
                   </Link>
                   </div>
-                  <Button type="submit" className="w-full" disabled={isLoading}>
+                  <Button type="submit" className="w-full" disabled={isLoading || !isFirebaseConfigured}>
                   {isLoading ? <><Loader2 className="h-4 w-4 animate-spin mr-2" />Signing In...</> : "Sign In"}
                   </Button>
               </form>

@@ -1,8 +1,9 @@
 
 'use server';
 /**
- * @fileOverview Scans a URL for common vulnerabilities.
- * FOR TESTING: This flow now returns a MOCK result almost instantly.
+ * @fileOverview Scans a URL for common vulnerabilities using AI analysis.
+ * This flow does not perform live network requests but analyzes the URL
+ * for patterns and known risks associated with certain technologies.
  *
  * - scanUrlForVulnerabilities - A function that handles the URL scanning process.
  * - ScanUrlForVulnerabilitiesInput - The input type for the scanUrlForVulnerabilities function.
@@ -11,94 +12,76 @@
 
 import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
-import type { AIScanResult } from '@/types'; // Import for the output type
+import type { AIScanResult } from '@/types';
 
 const ScanUrlForVulnerabilitiesInputSchema = z.object({
   url: z.string().url().describe('The URL to scan for vulnerabilities.'),
 });
 export type ScanUrlForVulnerabilitiesInput = z.infer<typeof ScanUrlForVulnerabilitiesInputSchema>;
 
-// Output schema matches AIScanResult structure
 const ScanUrlForVulnerabilitiesOutputSchema = z.object({
   vulnerabilities: z.array(
     z.object({
-      type: z.string().describe('The type of vulnerability detected.'),
+      type: z.string().describe('The type of vulnerability detected (e.g., SQL Injection, XSS, Insecure Headers).'),
       severity: z
         .enum(['Low', 'Medium', 'High', 'Critical'])
         .describe('The severity of the vulnerability.'),
-      description: z.string().describe('A detailed description of the vulnerability.'),
-      affectedUrl: z.string().url().optional().describe('The affected URL, if applicable.'),
-      affectedFile: z.string().optional().describe('The affected file, if applicable.'),
+      description: z.string().describe('A detailed description of the potential vulnerability, how it could be exploited, and why it is a risk.'),
+      affectedUrl: z.string().url().optional().describe('The specific URL or URL pattern that is potentially affected.'),
+      affectedFile: z.string().optional().describe('A hypothetical file path that could be vulnerable (e.g., /login.php, /api/users).'),
     })
-  ).describe('A list of vulnerabilities found during the scan.'),
-  summary: z.string().describe('A summary of the scan results in natural language.'),
+  ).describe('A list of potential vulnerabilities identified through analysis.'),
+  summary: z.string().describe('A natural language summary of the scan results, including an overall assessment of the security posture based on the URL analysis.'),
 });
 export type ScanUrlForVulnerabilitiesOutput = z.infer<typeof ScanUrlForVulnerabilitiesOutputSchema>;
 
-
-// This is the actual function that will be called by the application
 export async function scanUrlForVulnerabilities(input: ScanUrlForVulnerabilitiesInput): Promise<ScanUrlForVulnerabilitiesOutput> {
-  console.log(`[Mock AI Flow - scanUrlForVulnerabilities] Called for URL: ${input.url}. Simulating slight delay...`);
-  
-  // Simulate a very short delay to mimic network/processing time
-  await new Promise(resolve => setTimeout(resolve, 1500 + Math.random() * 1000)); // 1.5 to 2.5 seconds
-
-  // Return a hardcoded mock result
-  const mockResult: AIScanResult = {
-    summary: `Mock scan successfully completed for ${input.url}. This is a test result. Found 2 mock vulnerabilities of varying severity. Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.`,
-    vulnerabilities: [
-      {
-        type: "Mock SQL Injection (Critical)",
-        severity: "Critical",
-        description: "This is a critical mock SQL Injection vulnerability found at the login form (simulated). Input parameters were not properly sanitized, potentially allowing attackers to execute arbitrary SQL commands. Example: ' OR '1'='1",
-        affectedUrl: `${input.url}/login`
-      },
-      {
-        type: "Mock XSS (High)",
-        severity: "High",
-        description: "This is a high severity mock Cross-Site Scripting (XSS) vulnerability found in the search parameter (simulated). User-supplied input is reflected without proper escaping, allowing for script injection. Example: <script>alert('XSS')</script>",
-        affectedUrl: `${input.url}/search?q=<script>alert("mock_xss")</script>`,
-        affectedFile: "search.php (line 42, simulated)"
-      },
-      {
-        type: "Mock Insecure HTTP Header (Medium)",
-        severity: "Medium",
-        description: "The 'X-Frame-Options' header is missing or not set to 'DENY' or 'SAMEORIGIN'. This could make the site vulnerable to clickjacking attacks. It is recommended to set this header to prevent embedding in iframes from other domains.",
-        affectedUrl: input.url
-      },
-      {
-        type: "Mock Outdated jQuery Version (Low)",
-        severity: "Low",
-        description: "The application appears to be using jQuery v1.8.3 (simulated), which has known vulnerabilities (e.g., CVE-2019-11358). Consider updating to a more recent and patched version of jQuery to mitigate potential risks.",
-        affectedFile: "js/main.js (simulated)"
-      }
-    ]
-  };
-  console.log('[Mock AI Flow - scanUrlForVulnerabilities] Returning mock result:', mockResult);
-  return mockResult;
+  return scanUrlForVulnerabilitiesFlow(input);
 }
 
-// The Genkit flow definition below is now mostly for structure, as the actual logic is simplified above.
-// In a real scenario, this flow would contain the prompt and AI call.
-// However, to ensure the exported function is used directly, we call it within the flow.
+const prompt = ai.definePrompt({
+    name: 'scanUrlForVulnerabilitiesPrompt',
+    input: { schema: ScanUrlForVulnerabilitiesInputSchema },
+    output: { schema: ScanUrlForVulnerabilitiesOutputSchema },
+    prompt: `
+        You are a world-class cybersecurity expert AI. Your task is to analyze the provided URL and identify POTENTIAL security vulnerabilities.
+        
+        IMPORTANT: You MUST NOT access the URL or perform any network requests. Your analysis should be based solely on the structure of the URL, file extensions, query parameters, and your vast knowledge of web technologies, frameworks, and common attack vectors.
+
+        Analyze the URL: {{{url}}}
+
+        Based on your analysis, provide a list of potential vulnerabilities. For each vulnerability:
+        1.  Identify its type (e.g., SQL Injection, XSS, CSRF, Insecure Direct Object Reference, Security Misconfiguration, Outdated Component).
+        2.  Assign a severity level (Low, Medium, High, Critical).
+        3.  Provide a detailed, clear description of what the vulnerability is, how a potential attacker might exploit it given the URL structure, and the potential impact.
+        4.  If a specific part of the URL is relevant, list it as the 'affectedUrl'.
+
+        Example Analysis:
+        - If you see ".php?id=123", you should infer a high potential for SQL Injection and XSS.
+        - If you see "/wp-admin/", you should infer potential vulnerabilities related to outdated WordPress plugins or brute-force attacks.
+        - If you see "/api/v1/users", you should mention the risk of exposed APIs and insecure direct object references if not properly secured.
+        - If you see a common framework name or file extension, mention common vulnerabilities associated with it.
+
+        Your final output must be a JSON object that strictly adheres to the provided output schema. Create a comprehensive and educational summary. If the URL appears simple and has no obvious risk indicators (e.g., a static-looking site like "https://example.com/about-us"), state that and list low-severity, general best-practice recommendations like checking for secure headers.
+    `,
+});
+
 const scanUrlForVulnerabilitiesFlow = ai.defineFlow(
   {
-    name: 'scanUrlForVulnerabilitiesFlow', // Keep name consistent for Genkit registry
+    name: 'scanUrlForVulnerabilitiesFlow',
     inputSchema: ScanUrlForVulnerabilitiesInputSchema,
     outputSchema: ScanUrlForVulnerabilitiesOutputSchema,
   },
   async (input) => {
-    // This flow definition will call our simplified exported function directly.
-    // This ensures that any Genkit internal mechanisms are still triggered
-    // but the core logic is our fast mock.
-    console.log(`[Genkit Flow - scanUrlForVulnerabilitiesFlow] Invoking the direct mock function for URL: ${input.url}`);
-    const result = await scanUrlForVulnerabilities(input); 
-    console.log(`[Genkit Flow - scanUrlForVulnerabilitiesFlow] Mock function returned, result:`, result);
-    return result;
+    console.log(`[AI Flow - scanUrlForVulnerabilities] Starting real AI analysis for URL: ${input.url}`);
+    
+    const { output } = await prompt(input);
+
+    if (!output) {
+        throw new Error("The AI model did not return a valid output.");
+    }
+    
+    console.log(`[AI Flow - scanUrlForVulnerabilities] Analysis complete for URL: ${input.url}`);
+    return output;
   }
 );
-
-// We are exporting the direct function `scanUrlForVulnerabilities` for use in `ScanForm.tsx`.
-// The `scanUrlForVulnerabilitiesFlow` defined with `ai.defineFlow` is also present.
-// The key is that our application code directly calls `scanUrlForVulnerabilities`.
-// If Genkit tooling were to call 'scanUrlForVulnerabilitiesFlow', it would also end up executing our mock.

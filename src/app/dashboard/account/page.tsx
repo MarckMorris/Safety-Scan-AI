@@ -73,7 +73,7 @@ export default function AccountPage() {
       setIsLoading(true);
       await sendPasswordReset(user.email);
       toast({
-        title: "Password Reset Email Sent (Simulated)",
+        title: "Password Reset Email Sent",
         description: "Check your email for instructions to reset your password.",
       });
       setIsLoading(false);
@@ -97,7 +97,7 @@ export default function AccountPage() {
         <CardHeader>
           <div className="flex items-center space-x-4">
             <Avatar className="h-20 w-20">
-              <AvatarImage src={userProfile?.photoURL || undefined} alt={userProfile?.displayName || "User"} />
+              <AvatarImage src={userProfile?.photoURL || user?.photoURL || undefined} alt={userProfile?.displayName || "User"} />
               <AvatarFallback className="text-3xl">{getInitials(userProfile?.displayName)}</AvatarFallback>
             </Avatar>
             <div>
@@ -132,7 +132,7 @@ export default function AccountPage() {
                       <Input type="email" placeholder="you@example.com" {...field} disabled />
                     </FormControl>
                      <FormMessage />
-                     <p className="text-xs text-muted-foreground pt-1">Changing email is not supported in the mock environment.</p>
+                     <p className="text-xs text-muted-foreground pt-1">Changing email is not supported at this time.</p>
                   </FormItem>
                 )}
               />

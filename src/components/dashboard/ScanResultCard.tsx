@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Button } from "@/components/ui/button";
 import type { Scan } from "@/types";
 import { Badge } from "@/components/ui/badge";
-import { ArrowRight, CheckCircle, Clock, AlertTriangle, Loader2, FileText } from "lucide-react";
+import { ArrowRight, CheckCircle, Clock, AlertTriangle, Loader2 } from "lucide-react";
 import { formatDistanceToNow } from 'date-fns';
 
 interface ScanResultCardProps {
@@ -16,7 +16,7 @@ interface ScanResultCardProps {
 const getStatusBadgeVariant = (status: Scan["status"]): "default" | "secondary" | "destructive" | "outline" => {
   switch (status) {
     case "completed":
-      return "default"; // Will use primary color
+      return "default";
     case "failed":
       return "destructive";
     case "scanning":
@@ -58,7 +58,7 @@ export default function ScanResultCard({ scan }: ScanResultCardProps) {
                     {scan.targetUrl.length > 40 ? `${scan.targetUrl.substring(0, 37)}...` : scan.targetUrl}
                 </CardTitle>
                 <CardDescription>
-                Scanned {formatDistanceToNow(scan.createdAt, { addSuffix: true })}
+                {scan.createdAt ? `Scanned ${formatDistanceToNow(scan.createdAt, { addSuffix: true })}` : 'Scan date unavailable'}
                 </CardDescription>
             </div>
             <Badge variant={getStatusBadgeVariant(scan.status)} className="capitalize flex items-center gap-1">
@@ -91,7 +91,7 @@ export default function ScanResultCard({ scan }: ScanResultCardProps) {
       </CardContent>
       <CardFooter className="border-t pt-4">
         <Button variant="outline" asChild className="w-full">
-          <Link href={`/dashboard/scans/${scan.id}`}>
+          <Link href={`/dashboard/scans/${scan.id}?targetUrl=${encodeURIComponent(scan.targetUrl)}`}>
             View Details <ArrowRight className="ml-2 w-4 h-4" />
           </Link>
         </Button>

@@ -9,49 +9,13 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
-import { PlusCircle, Search, ListFilter, LayoutGrid, Loader2, History, AlertTriangle, Download, CheckCircle, Clock } from "lucide-react";
+import { PlusCircle, Search, ListFilter, LayoutGrid, Loader2, History, Download, CheckCircle, Clock, AlertTriangle } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { format } from 'date-fns';
 import { useToast } from "@/hooks/use-toast";
-
-
-// Mock scan data for UI testing if the user has no scans.
-export const mockScansData: Scan[] = [
-  {
-    id: "mock1", userId: "user-admin-01", targetUrl: "https://vulnerable-example.com", status: "completed",
-    createdAt: new Date(Date.now() - 86400000 * 2), // 2 days ago
-    updatedAt: new Date(Date.now() - 86400000 * 2),
-    aiScanResult: {
-      summary: "Mock scan found several critical issues on vulnerable-example.com.",
-      vulnerabilities: [
-        { type: "SQL Injection", severity: "Critical", description: "Found SQLi point in login form.", affectedUrl: "https://vulnerable-example.com/login" },
-        { type: "XSS", severity: "High", description: "Reflected XSS in search parameter.", affectedUrl: "https://vulnerable-example.com/search?q=<script>" },
-      ]
-    },
-    aiSecurityReport: { report: "Mock AI report: 1. Fix SQLi. 2. Sanitize XSS." }
-  },
-  {
-    id: "mock2", userId: "user-admin-01", targetUrl: "https://another-site.org", status: "failed",
-    createdAt: new Date(Date.now() - 86400000 * 1), // 1 day ago
-    updatedAt: new Date(Date.now() - 86400000 * 1),
-    errorMessage: "Mock Error: Target site was unreachable during scan.",
-  },
-  {
-    id: "mock3", userId: "user-regular-01", targetUrl: "https://secure-app.dev", status: "completed",
-    createdAt: new Date(),
-    updatedAt: new Date(),
-    aiScanResult: { summary: "Mock scan: secure-app.dev appears to be well configured.", vulnerabilities: [] },
-  },
-    {
-    id: "mock4", userId: "user-regular-01", targetUrl: "https://api.internal.co", status: "scanning",
-    createdAt: new Date(Date.now() - 3600000 * 1), // 1 hour ago
-    updatedAt: new Date(Date.now() - 3600000 * 1),
-  },
-];
-
 
 const getStatusBadgeVariant = (status: Scan["status"]): "default" | "secondary" | "destructive" | "outline" => {
   switch (status) {
@@ -72,9 +36,8 @@ const getStatusIcon = (status: Scan["status"]) => {
   }
 };
 
-
 export default function ScanHistoryPage() {
-  const { user, scans, loading } = useAuth();
+  const { scans, loading } = useAuth();
   const { toast } = useToast();
   const [searchTerm, setSearchTerm] = useState("");
   const [filterStatus, setFilterStatus] = useState("all");
@@ -96,6 +59,7 @@ export default function ScanHistoryPage() {
         return scan.aiScanResult.vulnerabilities.some(v => v.severity.toLowerCase() === filterSeverity.toLowerCase());
       })
       .sort((a, b) => {
+          if (!a.createdAt || !b.createdAt) return 0; // Handle cases where date might be null
           if (sortOrder === 'asc') {
               return a.createdAt.getTime() - b.createdAt.getTime();
           }
@@ -104,39 +68,39 @@ export default function ScanHistoryPage() {
   }, [scans, searchTerm, filterStatus, filterSeverity, sortOrder]);
   
   const handleExportAllReports = () => {
-    // Placeholder for exporting all reports (e.g., as a zip of PDFs or a summary CSV)
     toast({
         title: "Export Initiated (Placeholder)",
         description: "This would typically generate a batch export of the displayed scan reports as PDFs.",
     });
   };
 
+  const renderSkeletons = () => (
+    <div className="space-y-6">
+      <div className="flex flex-col md:flex-row justify-between items-center gap-4">
+        <Skeleton className="h-9 w-48" />
+        <Skeleton className="h-10 w-36" />
+      </div>
+      <div className="flex flex-col md:flex-row flex-wrap gap-4 mb-6">
+        <Skeleton className="h-10 flex-1 min-w-[200px]" />
+        <Skeleton className="h-10 w-full md:w-[180px]" />
+        <Skeleton className="h-10 w-full md:w-[180px]" />
+        <Skeleton className="h-10 w-full md:w-[150px]" />
+        <Skeleton className="h-10 w-24" />
+      </div>
+      <div className={`grid gap-6 ${viewMode === "grid" ? "md:grid-cols-2 lg:grid-cols-3" : "grid-cols-1"}`}>
+        {[1, 2, 3].map(i => (
+          <Card key={i} className="shadow-lg">
+            <CardHeader><Skeleton className="h-6 w-3/4" /><Skeleton className="h-4 w-1/2 mt-1" /></CardHeader>
+            <CardContent><Skeleton className="h-10 w-full" /><Skeleton className="h-8 w-3/4 mt-2" /></CardContent>
+            <CardFooter><Skeleton className="h-10 w-full" /></CardFooter>
+          </Card>
+        ))}
+      </div>
+    </div>
+  );
 
-  if (loading) { 
-    return (
-        <div className="space-y-6">
-            <div className="flex flex-col md:flex-row justify-between items-center gap-4">
-                <h1 className="text-3xl font-bold tracking-tight font-headline">Scan History</h1>
-                <Skeleton className="h-10 w-36" />
-            </div>
-            <div className="flex flex-col md:flex-row flex-wrap gap-4 mb-6">
-                <Skeleton className="h-10 flex-1 min-w-[200px]" />
-                <Skeleton className="h-10 w-full md:w-[180px]" />
-                <Skeleton className="h-10 w-full md:w-[180px]" />
-                <Skeleton className="h-10 w-full md:w-[150px]" />
-                <Skeleton className="h-10 w-24" />
-            </div>
-            <div className={`grid gap-6 ${viewMode === "grid" ? "md:grid-cols-2 lg:grid-cols-3" : "grid-cols-1"}`}>
-                {[1,2,3].map(i => (
-                    <Card key={i} className="shadow-lg">
-                        <CardHeader><Skeleton className="h-6 w-3/4" /><Skeleton className="h-4 w-1/2 mt-1" /></CardHeader>
-                        <CardContent><Skeleton className="h-10 w-full" /><Skeleton className="h-8 w-3/4 mt-2" /></CardContent>
-                        <CardFooter><Skeleton className="h-10 w-full" /></CardFooter>
-                    </Card>
-                ))}
-            </div>
-        </div>
-    );
+  if (loading) {
+    return renderSkeletons();
   }
 
   return (
@@ -147,139 +111,120 @@ export default function ScanHistoryPage() {
           <p className="text-muted-foreground">Review your past security scans and their results.</p>
         </div>
         <div className="flex gap-2">
-            <Button onClick={handleExportAllReports} variant="outline" disabled={filteredScans.length === 0}>
-                <Download className="mr-2 h-4 w-4" /> Export Displayed (PDF)
-            </Button>
-            <Button asChild>
+          <Button onClick={handleExportAllReports} variant="outline" disabled={filteredScans.length === 0}>
+            <Download className="mr-2 h-4 w-4" /> Export Displayed (PDF)
+          </Button>
+          <Button asChild>
             <Link href="/dashboard">
-                <PlusCircle className="mr-2 h-4 w-4" /> New Scan
+              <PlusCircle className="mr-2 h-4 w-4" /> New Scan
             </Link>
-            </Button>
+          </Button>
         </div>
       </div>
 
       <Card className="shadow-md">
         <CardHeader>
-            <div className="flex flex-col md:flex-row flex-wrap gap-2 items-center">
-                <div className="relative flex-grow w-full md:w-auto">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
-                <Input 
-                    placeholder="Search by URL or Scan ID..." 
-                    className="pl-10" 
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                />
-                </div>
-                <Select value={filterStatus} onValueChange={setFilterStatus}>
-                <SelectTrigger className="w-full md:w-[180px]">
-                    <SelectValue placeholder="Filter by status" />
-                </SelectTrigger>
-                <SelectContent>
-                    <SelectItem value="all">All Statuses</SelectItem>
-                    <SelectItem value="completed">Completed</SelectItem>
-                    <SelectItem value="scanning">Scanning</SelectItem>
-                    <SelectItem value="generating_report">Generating Report</SelectItem>
-                    <SelectItem value="queued">Queued</SelectItem>
-                    <SelectItem value="failed">Failed</SelectItem>
-                </SelectContent>
-                </Select>
-                <Select value={filterSeverity} onValueChange={setFilterSeverity}>
-                <SelectTrigger className="w-full md:w-[180px]">
-                    <SelectValue placeholder="Filter by severity" />
-                </SelectTrigger>
-                <SelectContent>
-                    <SelectItem value="all">All Severities</SelectItem>
-                    <SelectItem value="Critical">Critical</SelectItem>
-                    <SelectItem value="High">High</SelectItem>
-                    <SelectItem value="Medium">Medium</SelectItem>
-                    <SelectItem value="Low">Low</SelectItem>
-                </SelectContent>
-                </Select>
-                <Select value={sortOrder} onValueChange={setSortOrder}>
-                <SelectTrigger className="w-full md:w-[150px]">
-                    <SelectValue placeholder="Sort by date" />
-                </SelectTrigger>
-                <SelectContent>
-                    <SelectItem value="desc">Newest First</SelectItem>
-                    <SelectItem value="asc">Oldest First</SelectItem>
-                </SelectContent>
-                </Select>
-                <div className="flex items-center gap-1">
-                    <Button variant={viewMode === 'grid' ? 'default' : 'outline'} size="icon" onClick={() => setViewMode('grid')} title="Grid View">
-                        <LayoutGrid className="h-5 w-5"/>
-                    </Button>
-                    <Button variant={viewMode === 'list' ? 'default' : 'outline'} size="icon" onClick={() => setViewMode('list')} title="List View">
-                        <ListFilter className="h-5 w-5"/>
-                    </Button>
-                </div>
+          <div className="flex flex-col md:flex-row flex-wrap gap-2 items-center">
+            <div className="relative flex-grow w-full md:w-auto">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+              <Input 
+                placeholder="Search by URL or Scan ID..." 
+                className="pl-10" 
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
             </div>
+            <Select value={filterStatus} onValueChange={setFilterStatus}>
+              <SelectTrigger className="w-full md:w-[180px]"><SelectValue placeholder="Filter by status" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Statuses</SelectItem>
+                <SelectItem value="completed">Completed</SelectItem>
+                <SelectItem value="scanning">Scanning</SelectItem>
+                <SelectItem value="queued">Queued</SelectItem>
+                <SelectItem value="failed">Failed</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={filterSeverity} onValueChange={setFilterSeverity}>
+              <SelectTrigger className="w-full md:w-[180px]"><SelectValue placeholder="Filter by severity" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Severities</SelectItem>
+                <SelectItem value="Critical">Critical</SelectItem>
+                <SelectItem value="High">High</SelectItem>
+                <SelectItem value="Medium">Medium</SelectItem>
+                <SelectItem value="Low">Low</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={sortOrder} onValueChange={setSortOrder}>
+              <SelectTrigger className="w-full md:w-[150px]"><SelectValue placeholder="Sort by date" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="desc">Newest First</SelectItem>
+                <SelectItem value="asc">Oldest First</SelectItem>
+              </SelectContent>
+            </Select>
+            <div className="flex items-center gap-1">
+              <Button variant={viewMode === 'grid' ? 'default' : 'outline'} size="icon" onClick={() => setViewMode('grid')} title="Grid View"><LayoutGrid className="h-5 w-5"/></Button>
+              <Button variant={viewMode === 'list' ? 'default' : 'outline'} size="icon" onClick={() => setViewMode('list')} title="List View"><ListFilter className="h-5 w-5"/></Button>
+            </div>
+          </div>
         </CardHeader>
         <CardContent>
-            {!loading && filteredScans.length > 0 ? (
-                viewMode === "grid" ? (
-                <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-                    {filteredScans.map((scan) => (
-                    <ScanResultCard key={scan.id} scan={scan} />
-                    ))}
-                </div>
-                ) : ( // List View
-                <Table>
-                    <TableHeader>
-                    <TableRow>
-                        <TableHead>Target URL</TableHead>
-                        <TableHead>Status</TableHead>
-                        <TableHead>Vulnerabilities</TableHead>
-                        <TableHead>Scanned</TableHead>
-                        <TableHead>Actions</TableHead>
+          {filteredScans.length > 0 ? (
+            viewMode === "grid" ? (
+              <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                {filteredScans.map((scan) => (
+                  <ScanResultCard key={scan.id} scan={scan} />
+                ))}
+              </div>
+            ) : ( // List View
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Target URL</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Vulnerabilities</TableHead>
+                    <TableHead>Scanned</TableHead>
+                    <TableHead>Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredScans.map((scan) => (
+                    <TableRow key={scan.id}>
+                      <TableCell className="font-medium truncate max-w-xs" title={scan.targetUrl}>{scan.targetUrl}</TableCell>
+                      <TableCell>
+                        <Badge variant={getStatusBadgeVariant(scan.status)} className="capitalize flex items-center gap-1 text-xs">
+                          {getStatusIcon(scan.status)}
+                          {scan.status.replace('_', ' ')}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        {scan.aiScanResult?.vulnerabilities?.length ?? 0}
+                        {scan.aiScanResult?.vulnerabilities?.find(v => v.severity === 'Critical') && <Badge variant="destructive" className="ml-2 text-xs">Critical</Badge>}
+                      </TableCell>
+                      <TableCell className="text-xs text-muted-foreground">{scan.createdAt ? format(scan.createdAt, "MMM dd, yyyy") : 'N/A'}</TableCell>
+                      <TableCell>
+                        <Button variant="outline" size="sm" asChild>
+                          <Link href={`/dashboard/scans/${scan.id}?targetUrl=${encodeURIComponent(scan.targetUrl)}`}>Details</Link>
+                        </Button>
+                      </TableCell>
                     </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                    {filteredScans.map((scan) => (
-                        <TableRow key={scan.id}>
-                        <TableCell className="font-medium truncate max-w-xs" title={scan.targetUrl}>{scan.targetUrl}</TableCell>
-                        <TableCell>
-                            <Badge variant={getStatusBadgeVariant(scan.status)} className="capitalize flex items-center gap-1 text-xs">
-                            {getStatusIcon(scan.status)}
-                            {scan.status.replace('_', ' ')}
-                            </Badge>
-                        </TableCell>
-                        <TableCell>
-                            {scan.aiScanResult?.vulnerabilities?.length ?? 0}
-                            {scan.aiScanResult?.vulnerabilities?.find(v => v.severity === 'Critical') && <Badge variant="destructive" className="ml-2 text-xs">Critical</Badge>}
-                        </TableCell>
-                        <TableCell className="text-xs text-muted-foreground">{format(scan.createdAt, "MMM dd, yyyy")}</TableCell>
-                        <TableCell>
-                            <Button variant="outline" size="sm" asChild>
-                            <Link href={`/dashboard/scans/${scan.id}?targetUrl=${encodeURIComponent(scan.targetUrl)}`}>Details</Link>
-                            </Button>
-                        </TableCell>
-                        </TableRow>
-                    ))}
-                    </TableBody>
-                </Table>
-                )
-            ) : !loading && filteredScans.length === 0 ? (
-                <div className="text-center py-12">
-                <History className="mx-auto h-16 w-16 text-muted-foreground mb-4" />
-                <h3 className="text-xl font-semibold">No Scans Found</h3>
-                <p className="text-muted-foreground">
-                    {scans.length === 0 && !searchTerm && filterStatus === 'all' && filterSeverity === 'all'
-                     ? "You haven't performed any scans yet." 
-                     : "No scans match your current filters."}
-                </p>
-                {scans.length === 0 && !searchTerm && filterStatus === 'all' && filterSeverity === 'all' && (
-                    <Button asChild className="mt-4">
-                        <Link href="/dashboard">Start Your First Scan</Link>
-                    </Button>
-                )}
-                </div>
-            ) : null }
-             {loading && (
-                <div className="flex justify-center items-center py-12">
-                    <Loader2 className="h-10 w-10 animate-spin text-primary" />
-                    <p className="ml-3 text-muted-foreground">Loading scan history...</p>
-                </div>
-            )}
+                  ))}
+                </TableBody>
+              </Table>
+            )
+          ) : (
+            <div className="text-center py-12">
+              <History className="mx-auto h-16 w-16 text-muted-foreground mb-4" />
+              <h3 className="text-xl font-semibold">No Scans Found</h3>
+              <p className="text-muted-foreground">
+                {scans.length === 0 ? "You haven't performed any scans yet." : "No scans match your current filters."}
+              </p>
+              {scans.length === 0 && (
+                <Button asChild className="mt-4">
+                  <Link href="/dashboard">Start Your First Scan</Link>
+                </Button>
+              )}
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>

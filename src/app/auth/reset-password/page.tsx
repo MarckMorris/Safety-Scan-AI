@@ -5,7 +5,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import * as z from "zod";
 import Link from "next/link";
-import { useAuth } from "@/context/AuthContext"; // Use our central auth context
+import { useAuth } from "@/context/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
@@ -23,7 +23,7 @@ type ResetPasswordFormValues = z.infer<typeof resetPasswordSchema>;
 
 export default function ResetPasswordPage() {
   const { toast } = useToast();
-  const { sendPasswordReset } = useAuth(); // Get the new function
+  const { sendPasswordReset, isFirebaseConfigured } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
   const [emailSent, setEmailSent] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -46,8 +46,8 @@ export default function ResetPasswordPage() {
       setError(resetError);
     } else {
       toast({
-        title: "Password Reset Email Sent (Simulated)",
-        description: "In a real app, you would check your inbox for instructions.",
+        title: "Password Reset Email Sent",
+        description: "Please check your inbox for instructions.",
       });
       setEmailSent(true);
     }
@@ -67,11 +67,20 @@ export default function ResetPasswordPage() {
           <CardTitle className="text-2xl font-headline">Reset Your Password</CardTitle>
           <CardDescription>
             {emailSent 
-              ? "Check your email for the reset link (this is simulated)." 
+              ? "Check your email for the reset link." 
               : "Enter your email address and we'll send you a link to reset your password."}
           </CardDescription>
         </CardHeader>
         <CardContent>
+          {!isFirebaseConfigured && (
+              <Alert variant="destructive" className="mb-6">
+                  <AlertTriangle className="h-4 w-4" />
+                  <AlertTitle>Configuration Error</AlertTitle>
+                  <AlertDescription>
+                      This feature is disabled. The administrator has not configured Firebase.
+                  </AlertDescription>
+              </Alert>
+          )}
           {error && (
               <Alert variant="destructive" className="mb-6">
                   <AlertTriangle className="h-4 w-4" />
@@ -89,20 +98,20 @@ export default function ResetPasswordPage() {
                     <FormItem>
                       <FormLabel>Email Address</FormLabel>
                       <FormControl>
-                        <Input type="email" placeholder="you@example.com" {...field} disabled={isLoading} />
+                        <Input type="email" placeholder="you@example.com" {...field} disabled={isLoading || !isFirebaseConfigured} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
-                <Button type="submit" className="w-full" disabled={isLoading}>
+                <Button type="submit" className="w-full" disabled={isLoading || !isFirebaseConfigured}>
                   {isLoading ? <><Loader2 className="h-4 w-4 animate-spin mr-2" />Sending...</> : "Send Reset Link"}
                 </Button>
               </form>
             </Form>
           ) : (
              <div className="text-center">
-                <p className="text-green-600">A password reset link has been sent to your email address (Simulated).</p>
+                <p className="text-green-600">A password reset link has been sent to your email address.</p>
              </div>
           )}
           <div className="mt-6 text-center text-sm">

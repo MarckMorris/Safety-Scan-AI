@@ -10,14 +10,11 @@ import ReportDisplay from "@/components/dashboard/ReportDisplay";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, CheckCircle, AlertTriangle, Clock, Loader2, FileText, Download, Wand2, Code, AlertCircle, Info } from "lucide-react";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from "@/components/ui/accordion";
-import { ScrollArea } from "@/components/ui/scroll-area";
+import { Accordion } from "@/components/ui/accordion";
 import { useToast } from "@/hooks/use-toast";
 import { generateSecurityImprovementReport } from "@/ai/flows/generate-security-improvement-report";
 import { Badge } from "@/components/ui/badge";
 import { format } from 'date-fns';
-import { mockScansData } from "@/app/dashboard/scans/page";
-
 
 const getStatusBadgeVariant = (status?: Scan["status"]): "default" | "secondary" | "destructive" | "outline" => {
   if (!status) return "outline";
@@ -40,33 +37,28 @@ const getStatusIcon = (status?: Scan["status"]) => {
   }
 };
 
-
 export default function ScanDetailPage() {
   const params = useParams();
   const searchParams = useSearchParams();
   const scanId = params.scanId as string;
-  const { user, loading: authLoading, scans, updateScan } = useAuth();
+  const { user, userProfile, loading: authLoading, scans, updateScan } = useAuth();
   const router = useRouter();
   const { toast } = useToast();
 
   const [scan, setScan] = useState<Scan | null>(null);
   const [loading, setLoading] = useState(true);
   const [isGeneratingReport, setIsGeneratingReport] = useState(false);
-  const [patchSuggestions, setPatchSuggestions] = useState<AIPatchSuggestion[]>([]);
-  const [isLoadingPatches, setIsLoadingPatches] = useState(false);
   
   const initialTargetUrl = useMemo(() => {
     const urlFromQuery = searchParams.get("targetUrl");
     return urlFromQuery ? decodeURIComponent(urlFromQuery) : null;
   }, [searchParams]);
 
-
   useEffect(() => {
     setLoading(true);
-    if (authLoading) return; // Wait for auth to be ready
+    if (authLoading) return;
 
     if (!user) {
-        toast({ title: "Authentication Required", description: "You must be logged in to view scan details.", variant: "destructive" });
         router.push("/auth/login");
         return;
     }
@@ -86,13 +78,11 @@ export default function ScanDetailPage() {
             updatedAt: new Date(),
         });
     } else if (!foundScan && scans.length > 0) {
-        // If scans are loaded but this one wasn't found, it's likely an error
         toast({ title: "Scan Not Found", description: `The scan with ID ${scanId} could not be found.`, variant: "destructive" });
         router.push("/dashboard/scans");
     }
     setLoading(false);
   }, [scanId, scans, authLoading, user, initialTargetUrl, router, toast]);
-
 
   const handleGenerateReport = async () => {
     if (!scan || !scan.aiScanResult || !user || scan.status !== 'completed') {
@@ -125,45 +115,6 @@ export default function ScanDetailPage() {
     }
   };
 
-  const handleGeneratePatchSuggestions = async () => {
-    if (!scan || !scan.aiScanResult?.vulnerabilities || scan.aiScanResult.vulnerabilities.length === 0) {
-        toast({ title: "No Vulnerabilities", description: "No vulnerabilities to generate patches for.", variant: "default" });
-        return;
-    }
-    setIsLoadingPatches(true);
-    await new Promise(resolve => setTimeout(resolve, 1500)); // Simulate AI call
-    const mockSuggestions: AIPatchSuggestion[] = scan.aiScanResult.vulnerabilities.map(v => ({
-        vulnerabilityType: v.type,
-        vulnerabilityDescription: v.description,
-        affectedComponent: v.affectedUrl || v.affectedFile || "Unknown component",
-        suggestedCodePatch: `// Mock fix for ${v.type}\nconsole.log("Secure this: ${v.description.substring(0,30)}...");`,
-        explanation: `This is a mock patch explanation for ${v.type} at ${v.affectedUrl || v.affectedFile || 'N/A'}. Severity: ${v.severity}. Ensure all inputs are validated and outputs encoded.`,
-        language: 'javascript'
-    }));
-    setPatchSuggestions(mockSuggestions);
-    setIsLoadingPatches(false);
-    toast({ title: "Patch Suggestions Generated (Mock)", description: "Displaying mock patch suggestions." });
-  };
-
-  const handleDownloadPatches = (formatType: "json" | "text") => {
-    if (patchSuggestions.length === 0) {
-        toast({title: "No Patches", description: "No patch suggestions to download.", variant: "default"});
-        return;
-    }
-    const dataStr = formatType === "json"
-        ? JSON.stringify(patchSuggestions, null, 2)
-        : patchSuggestions.map(p => `Vulnerability: ${p.vulnerabilityType}\nAffected: ${p.affectedComponent}\nSuggestion:\n${p.suggestedCodePatch}\nExplanation:\n${p.explanation}\n\n---\n\n`).join('');
-    
-    const dataUri = `data:text/${formatType};charset=utf-8,${encodeURIComponent(dataStr)}`;
-    const downloadLink = document.createElement('a');
-    downloadLink.setAttribute('href', dataUri);
-    downloadLink.setAttribute('download', `patch_suggestions_${scanId}.${formatType}`);
-    document.body.appendChild(downloadLink);
-    downloadLink.click();
-    document.body.removeChild(downloadLink);
-    toast({title: "Patches Downloaded", description: `Patch suggestions downloaded as ${formatType}.`});
-  };
-
   const displayTargetUrl = scan?.targetUrl || initialTargetUrl;
   const vulnerabilities = scan?.aiScanResult?.vulnerabilities || [];
 
@@ -175,7 +126,7 @@ export default function ScanDetailPage() {
         </Button>
         <div className="flex items-center justify-center h-64">
           <Loader2 className="h-12 w-12 animate-spin text-primary" />
-          <p className="ml-4 text-lg text-muted-foreground">Loading scan details for {displayTargetUrl || scanId}...</p>
+          <p className="ml-4 text-lg text-muted-foreground">Loading scan details...</p>
         </div>
       </div>
     );
@@ -206,9 +157,6 @@ export default function ScanDetailPage() {
                 <h1 className="text-3xl font-bold tracking-tight font-headline truncate" title={displayTargetUrl || "Loading URL..."}>{displayTargetUrl || "Loading URL..."}</h1>
                 <p className="text-sm text-muted-foreground">
                     Queued/Scanned on: {scan?.createdAt ? format(scan.createdAt, "MMM dd, yyyy 'at' hh:mm a") : 'N/A'}
-                    {scan?.updatedAt && scan?.createdAt?.getSeconds() !== scan?.updatedAt?.getSeconds() && (
-                       ` (Updated: ${format(scan.updatedAt, "hh:mm a")})`
-                    )}
                 </p>
             </div>
             <Badge variant={getStatusBadgeVariant(scan?.status)} className="text-base px-4 py-2 capitalize flex items-center gap-2">
@@ -229,7 +177,7 @@ export default function ScanDetailPage() {
         </Card>
       )}
 
-      {(loading || scan?.status === "scanning" || scan?.status === "queued" || scan?.status === "generating_report") && !scan?.aiScanResult && scan?.status !== 'failed' && (
+      {(scan?.status === "scanning" || scan?.status === "queued") && !scan?.aiScanResult && (
         <Card className="shadow-lg">
             <CardHeader>
                 <CardTitle className="text-xl font-headline flex items-center">
@@ -246,7 +194,7 @@ export default function ScanDetailPage() {
         </Card>
       )}
 
-      {scan?.aiScanResult && (scan?.status === "completed" || scan?.status === "generating_report" || (scan?.status === "failed" && scan.aiScanResult)) && (
+      {scan?.aiScanResult && (
         <Card className="shadow-lg">
           <CardHeader>
             <CardTitle className="text-xl font-headline flex items-center">
@@ -271,88 +219,16 @@ export default function ScanDetailPage() {
           </CardContent>
         </Card>
       )}
-
-      {scan?.status === 'completed' && vulnerabilities.length > 0 && (
-        <Card className="shadow-lg">
-          <CardHeader className="flex flex-row justify-between items-center">
-            <div>
-                <CardTitle className="text-xl font-headline flex items-center">
-                    <Wand2 className="w-6 h-6 mr-2 text-primary" /> AI Patch Suggestions (Mock)
-                </CardTitle>
-                <CardDescription>Get AI-powered code suggestions to fix identified vulnerabilities.</CardDescription>
-            </div>
-            {!patchSuggestions.length && (
-                <Button onClick={handleGeneratePatchSuggestions} disabled={isLoadingPatches}>
-                {isLoadingPatches ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Wand2 className="mr-2 h-4 w-4" />}
-                Generate Patches
-                </Button>
-            )}
-          </CardHeader>
-          {patchSuggestions.length > 0 && (
-            <CardContent>
-              <Accordion type="multiple" className="w-full space-y-2">
-                {patchSuggestions.map((patch, index) => (
-                  <AccordionItem value={`patch-${index}`} key={`${scan?.id}-patch-${index}`} className="bg-muted/50 rounded-md">
-                    <AccordionTrigger className="px-4 text-left hover:no-underline">
-                        <div className="flex items-center gap-2">
-                            <Code className="w-5 h-5 text-primary"/>
-                            <span>Fix for: {patch.vulnerabilityType} at {patch.affectedComponent.substring(0,50)}{patch.affectedComponent.length > 50 ? '...' : ''}</span>
-                        </div>
-                    </AccordionTrigger>
-                    <AccordionContent className="px-4 pt-2 pb-4 space-y-2">
-                      <h4 className="font-semibold mt-2">Explanation:</h4>
-                      <p className="text-sm text-muted-foreground whitespace-pre-line">{patch.explanation}</p>
-                      <h4 className="font-semibold mt-2">Suggested Code ({patch.language || 'generic'}):</h4>
-                      <ScrollArea className="max-h-60 w-full">
-                        <pre className="bg-background p-3 rounded-md text-xs overflow-x-auto"><code>{patch.suggestedCodePatch}</code></pre>
-                      </ScrollArea>
-                    </AccordionContent>
-                  </AccordionItem>
-                ))}
-              </Accordion>
-            </CardContent>
-          )}
-           {patchSuggestions.length > 0 && (
-            <CardFooter className="gap-2 border-t pt-4 mt-4">
-                 <Button variant="outline" onClick={() => handleDownloadPatches("json")}>
-                    <Download className="mr-2 h-4 w-4" /> Download as JSON
-                </Button>
-                <Button variant="outline" onClick={() => handleDownloadPatches("text")}>
-                    <Download className="mr-2 h-4 w-4" /> Download as Text
-                </Button>
-            </CardFooter>
-          )}
-          {!patchSuggestions.length && isLoadingPatches && (
-            <CardContent className="text-center py-6">
-                <Loader2 className="h-6 w-6 animate-spin text-primary mx-auto mb-2" />
-                <p className="text-muted-foreground">Generating patch suggestions...</p>
-            </CardContent>
-          )}
-        </Card>
-      )}
-
-
+      
       <ReportDisplay
         scanId={scan?.id}
         reportData={scan?.aiSecurityReport}
-        isLoading={isGeneratingReport}
+        isLoading={isGeneratingReport || scan?.status === 'generating_report'}
         onGenerateReport={scan?.status === 'completed' && scan?.aiScanResult && !scan?.aiSecurityReport ? handleGenerateReport : undefined}
         scanTargetUrl={displayTargetUrl || undefined}
         scanDate={scan?.createdAt ? scan.createdAt : new Date()}
-        userDisplayName={user?.displayName || "User"}
+        userDisplayName={userProfile?.displayName || "User"}
       />
-      {scan?.id.startsWith("mock-") && (
-         <Card className="border-amber-500 bg-amber-50 mt-4 dark:bg-amber-900/30">
-            <CardContent className="p-4">
-              <div className="flex items-center gap-2">
-                <Info className="h-5 w-5 text-amber-600 dark:text-amber-400" />
-                <p className="text-sm text-amber-700 dark:text-amber-300">
-                  This is mock scan data for demonstration purposes. Features like report generation may be disabled.
-                </p>
-              </div>
-            </CardContent>
-          </Card>
-      )}
     </div>
   );
 }
