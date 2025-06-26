@@ -2,7 +2,7 @@
 "use client";
 
 import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
-import type { User, Auth } from 'firebase/auth';
+import type { User } from 'firebase/auth';
 import { 
   onAuthStateChanged, 
   signOut as firebaseSignOut,
@@ -42,7 +42,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       return;
     }
 
-    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+    const unsubscribe = onAuthStateChanged(auth!, async (firebaseUser) => {
       if (firebaseUser) {
         setUser(firebaseUser);
         const userDocRef = doc(db as Firestore, "users", firebaseUser.uid);
@@ -70,9 +70,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   const logout = async () => {
-    if (!isFirebaseInitialized) return;
+    if (!isFirebaseInitialized || !auth) return;
     try {
-      await firebaseSignOut(auth as Auth);
+      await firebaseSignOut(auth);
       router.push('/auth/login');
     } catch (error) {
       console.error("Error signing out: ", error);
@@ -80,11 +80,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const registerUser = async (displayName: string, email: string, password: string) => {
+    if (!isFirebaseInitialized) {
+      return { error: CONFIG_ERROR_MESSAGE };
+    }
     try {
-      if (!auth || !db) {
-        return { error: CONFIG_ERROR_MESSAGE };
-      }
-      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+      const userCredential = await createUserWithEmailAndPassword(auth!, email, password);
       const user = userCredential.user;
 
       await updateProfile(user, { displayName }); 
@@ -95,7 +95,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         displayName: displayName,
         role: 'user', 
       };
-      await setDoc(doc(db, "users", user.uid), userProfileData);
+      await setDoc(doc(db!, "users", user.uid), userProfileData);
 
       return {};
     } catch (error: any) {
@@ -111,11 +111,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const signInUser = async (email: string, password: string) => {
+    if (!isFirebaseInitialized) {
+      return { error: CONFIG_ERROR_MESSAGE };
+    }
     try {
-      if (!auth) {
-        return { error: CONFIG_ERROR_MESSAGE };
-      }
-      await signInWithEmailAndPassword(auth, email, password);
+      await signInWithEmailAndPassword(auth!, email, password);
       return {};
     } catch (error: any) {
       console.error("Login error", error);
@@ -130,11 +130,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
   
   const sendPasswordReset = async (email: string) => {
-    try {
-       if (!auth) {
+    if (!isFirebaseInitialized) {
         return { error: CONFIG_ERROR_MESSAGE };
-      }
-      await sendPasswordResetEmail(auth, email);
+    }
+    try {
+      await sendPasswordResetEmail(auth!, email);
       return {};
     } catch (error: any) {
       console.error("Password reset error", error);
