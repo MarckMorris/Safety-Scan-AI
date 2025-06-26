@@ -16,6 +16,7 @@ interface AuthContextType {
   userProfile: UserProfile | null;
   scans: Scan[];
   loading: boolean;
+  authError: string | null; // For database connection errors
   logout: () => Promise<void>;
   registerUser: (displayName: string, email: string, password: string) => Promise<{ error?: string }>;
   signInUser: (email: string, password: string) => Promise<{ error?: string }>;
@@ -32,18 +33,22 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [scans, setScans] = useState<Scan[]>([]);
   const [loading, setLoading] = useState(true);
+  const [authError, setAuthError] = useState<string | null>(null);
   const router = useRouter();
 
   useEffect(() => {
     if (!isFirebaseInitialized) {
       console.error(CONFIG_ERROR_MESSAGE);
+      setAuthError(CONFIG_ERROR_MESSAGE);
       setLoading(false);
       return;
     }
 
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      setLoading(true);
       if (user) {
         setUser(user);
+        setAuthError(null); // Clear previous errors on new auth state
         try {
             const userDocRef = doc(db, 'users', user.uid);
             const userDocSnap = await getDoc(userDocRef);
@@ -60,16 +65,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
               await setDoc(userDocRef, newUserProfile);
               setUserProfile(newUserProfile);
             }
-        } catch (error) {
+        } catch (error: any) {
             console.error("Firestore Error: Failed to get user document.", error);
-            console.error("This may be due to Firestore not being enabled in your Firebase project, or incorrect security rules. Please check the Firebase console.");
-            // Prevent app from being stuck in a loading state
+            const friendlyError = "Could not connect to the database. This can happen if Firestore is not enabled in your Firebase project or if security rules are blocking access.";
+            setAuthError(friendlyError);
             setUserProfile(null);
         }
       } else {
         setUser(null);
         setUserProfile(null);
         setScans([]);
+        setAuthError(null);
       }
       setLoading(false);
     });
@@ -78,7 +84,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   useEffect(() => {
-    if (userProfile && isFirebaseInitialized) {
+    if (userProfile && isFirebaseInitialized && !authError) {
       const scansCollectionRef = collection(db, 'users', userProfile.uid, 'scans');
       const q = query(scansCollectionRef, orderBy('createdAt', 'desc'));
 
@@ -96,6 +102,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         setScans(userScans);
       }, (error) => {
         console.error("Error fetching scans:", error);
+        const friendlyError = "Could not fetch scan history from the database. Please check your Firestore security rules.";
+        setAuthError(friendlyError);
         if (error.code === 'failed-precondition') {
             console.error("This can happen if Firestore indexes are not set up.");
         }
@@ -103,7 +111,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
       return () => unsubscribe();
     }
-  }, [userProfile]);
+  }, [userProfile, authError]);
 
   const logout = async () => {
     if (!isFirebaseInitialized) return;
@@ -222,6 +230,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         userProfile, 
         scans,
         loading, 
+        authError,
         logout, 
         registerUser, 
         signInUser, 
