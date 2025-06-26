@@ -26,7 +26,7 @@ type LoginFormValues = z.infer<typeof loginSchema>;
 export default function LoginPage() {
   const router = useRouter();
   const { toast } = useToast();
-  const { signInUser, user, loading: authLoading, isFirebaseConfigured } = useAuth();
+  const { signInUser, user, loading: authLoading } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -86,16 +86,6 @@ export default function LoginPage() {
             <CardDescription>Sign in to access your dashboard.</CardDescription>
           </CardHeader>
           <CardContent>
-              {!isFirebaseConfigured && (
-                  <Alert variant="destructive" className="mb-6">
-                    <AlertTriangle className="h-4 w-4" />
-                    <AlertTitle>Configuration Error</AlertTitle>
-                    <AlertDescription>
-                        Firebase is not configured. Please add your Firebase project configuration to the 
-                        <code>.env.local</code> file and restart the server.
-                    </AlertDescription>
-                  </Alert>
-              )}
               {error && (
                    <Alert variant="destructive" className="mb-6">
                       <AlertTriangle className="h-4 w-4" />
@@ -112,7 +102,7 @@ export default function LoginPage() {
                       <FormItem>
                       <FormLabel>Email Address</FormLabel>
                       <FormControl>
-                          <Input type="email" placeholder="you@example.com" {...field} disabled={isLoading || !isFirebaseConfigured} />
+                          <Input type="email" placeholder="you@example.com" {...field} disabled={isLoading} />
                       </FormControl>
                       <FormMessage />
                       </FormItem>
@@ -125,7 +115,7 @@ export default function LoginPage() {
                       <FormItem>
                       <FormLabel>Password</FormLabel>
                       <FormControl>
-                          <Input type="password" placeholder="••••••••" {...field} disabled={isLoading || !isFirebaseConfigured} />
+                          <Input type="password" placeholder="••••••••" {...field} disabled={isLoading} />
                       </FormControl>
                       <FormMessage />
                       </FormItem>
@@ -136,7 +126,7 @@ export default function LoginPage() {
                       <Button variant="link" type="button" className="p-0 h-auto font-normal">Forgot password?</Button>
                   </Link>
                   </div>
-                  <Button type="submit" className="w-full" disabled={isLoading || !isFirebaseConfigured}>
+                  <Button type="submit" className="w-full" disabled={isLoading}>
                   {isLoading ? <><Loader2 className="h-4 w-4 animate-spin mr-2" />Signing In...</> : "Sign In"}
                   </Button>
               </form>

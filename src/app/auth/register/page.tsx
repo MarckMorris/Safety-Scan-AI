@@ -27,7 +27,7 @@ type RegisterFormValues = z.infer<typeof registerSchema>;
 export default function RegisterPage() {
   const router = useRouter();
   const { toast } = useToast();
-  const { registerUser, user, loading: authLoading, isFirebaseConfigured } = useAuth();
+  const { registerUser, user, loading: authLoading } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -88,16 +88,6 @@ export default function RegisterPage() {
           <CardDescription>Join Safety Scan AI to start securing your applications.</CardDescription>
         </CardHeader>
         <CardContent>
-            {!isFirebaseConfigured && (
-                <Alert variant="destructive" className="mb-6">
-                    <AlertTriangle className="h-4 w-4" />
-                    <AlertTitle>Configuration Error</AlertTitle>
-                    <AlertDescription>
-                        Firebase is not configured. Please add your Firebase project configuration to the 
-                        <code>.env.local</code> file and restart the server.
-                    </AlertDescription>
-                </Alert>
-            )}
             {error && (
                 <Alert variant="destructive" className="mb-6">
                     <AlertTriangle className="h-4 w-4" />
@@ -114,7 +104,7 @@ export default function RegisterPage() {
                     <FormItem>
                     <FormLabel>Display Name</FormLabel>
                     <FormControl>
-                        <Input placeholder="Your Name" {...field} disabled={isLoading || !isFirebaseConfigured} />
+                        <Input placeholder="Your Name" {...field} disabled={isLoading} />
                     </FormControl>
                     <FormMessage />
                     </FormItem>
@@ -127,7 +117,7 @@ export default function RegisterPage() {
                     <FormItem>
                     <FormLabel>Email Address</FormLabel>
                     <FormControl>
-                        <Input type="email" placeholder="you@example.com" {...field} disabled={isLoading || !isFirebaseConfigured} />
+                        <Input type="email" placeholder="you@example.com" {...field} disabled={isLoading} />
                     </FormControl>
                     <FormMessage />
                     </FormItem>
@@ -140,13 +130,13 @@ export default function RegisterPage() {
                     <FormItem>
                     <FormLabel>Password</FormLabel>
                     <FormControl>
-                        <Input type="password" placeholder="••••••••" {...field} disabled={isLoading || !isFirebaseConfigured} />
+                        <Input type="password" placeholder="••••••••" {...field} disabled={isLoading} />
                     </FormControl>
                     <FormMessage />
                     </FormItem>
                 )}
                 />
-                <Button type="submit" className="w-full" disabled={isLoading || !isFirebaseConfigured}>
+                <Button type="submit" className="w-full" disabled={isLoading}>
                 {isLoading ? <><Loader2 className="h-4 w-4 animate-spin mr-2" />Creating Account...</> : "Create Account"}
                 </Button>
             </form>

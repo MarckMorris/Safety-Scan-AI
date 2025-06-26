@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation';
 import { User as FirebaseUser, onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, sendPasswordResetEmail, updateProfile } from 'firebase/auth';
 import { doc, getDoc, setDoc, collection, query, onSnapshot, addDoc, updateDoc, serverTimestamp, orderBy } from 'firebase/firestore';
 import { auth, db, isFirebaseInitialized } from '@/lib/firebase';
-import type { UserProfile, Scan, AIScanResult, AISecurityReport } from '@/types';
+import type { UserProfile, Scan, AIScanResult } from '@/types';
 import { scanUrlForVulnerabilities } from '@/ai/flows/scan-url-for-vulnerabilities';
 
 const CONFIG_ERROR_MESSAGE = "Firebase configuration is invalid. Please check your .env.local file and restart the development server.";
@@ -16,7 +16,6 @@ interface AuthContextType {
   userProfile: UserProfile | null;
   scans: Scan[];
   loading: boolean;
-  isFirebaseConfigured: boolean;
   logout: () => Promise<void>;
   registerUser: (displayName: string, email: string, password: string) => Promise<{ error?: string }>;
   signInUser: (email: string, password: string) => Promise<{ error?: string }>;
@@ -33,11 +32,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [scans, setScans] = useState<Scan[]>([]);
   const [loading, setLoading] = useState(true);
-  const isFirebaseConfigured = isFirebaseInitialized;
   const router = useRouter();
 
   useEffect(() => {
-    if (!isFirebaseConfigured) {
+    if (!isFirebaseInitialized) {
       setLoading(false);
       return;
     }
@@ -69,10 +67,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     });
 
     return () => unsubscribe();
-  }, [isFirebaseConfigured]);
+  }, []);
 
   useEffect(() => {
-    if (userProfile) {
+    if (userProfile && isFirebaseInitialized) {
       const scansCollectionRef = collection(db, 'users', userProfile.uid, 'scans');
       const q = query(scansCollectionRef, orderBy('createdAt', 'desc'));
 
@@ -88,6 +86,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             } as Scan);
         });
         setScans(userScans);
+      }, (error) => {
+        console.error("Error fetching scans:", error);
+        if (error.code === 'failed-precondition') {
+            console.error("This can happen if Firestore indexes are not set up.");
+        }
       });
 
       return () => unsubscribe();
@@ -95,14 +98,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, [userProfile]);
 
   const logout = async () => {
-    if (!isFirebaseConfigured) return;
+    if (!isFirebaseInitialized) return;
     await signOut(auth);
     router.push('/auth/login');
   };
 
   const registerUser = async (displayName: string, email: string, password: string) => {
-    if (!isFirebaseConfigured) return { error: CONFIG_ERROR_MESSAGE };
     try {
+      if (!isFirebaseInitialized) throw new Error('auth/configuration-not-found');
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       const firebaseUser = userCredential.user;
       await updateProfile(firebaseUser, { displayName });
@@ -116,33 +119,41 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       await setDoc(doc(db, 'users', firebaseUser.uid), userProfileData);
       return {};
     } catch (error: any) {
+      if (error.code === 'auth/configuration-not-found') {
+        return { error: CONFIG_ERROR_MESSAGE };
+      }
       return { error: error.message };
     }
   };
 
   const signInUser = async (email: string, password: string) => {
-    if (!isFirebaseConfigured) return { error: CONFIG_ERROR_MESSAGE };
     try {
+      if (!isFirebaseInitialized) throw new Error('auth/configuration-not-found');
       await signInWithEmailAndPassword(auth, email, password);
       return {};
     } catch (error: any) {
+       if (error.code === 'auth/configuration-not-found') {
+        return { error: CONFIG_ERROR_MESSAGE };
+      }
       return { error: error.message };
     }
   };
 
   const sendPasswordReset = async (email: string) => {
-    if (!isFirebaseConfigured) return { error: CONFIG_ERROR_MESSAGE };
     try {
+      if (!isFirebaseInitialized) throw new Error('auth/configuration-not-found');
       await sendPasswordResetEmail(auth, email);
       return {};
     } catch (error: any) {
+       if (error.code === 'auth/configuration-not-found') {
+        return { error: CONFIG_ERROR_MESSAGE };
+      }
       return { error: error.message };
     }
   };
 
   const updateUserProfile = async (updates: Partial<UserProfile>) => {
-    if (!user || !userProfile) return { error: "User not authenticated." };
-    if (!isFirebaseConfigured) return { error: CONFIG_ERROR_MESSAGE };
+    if (!user || !userProfile || !isFirebaseInitialized) return { error: "User not authenticated or Firebase not configured." };
 
     try {
         if(updates.displayName && user.displayName !== updates.displayName) {
@@ -157,14 +168,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
   
   const updateScan = useCallback(async (scanId: string, updates: Partial<Scan>) => {
-    if (!user) return;
+    if (!user || !isFirebaseInitialized) return;
     const scanDocRef = doc(db, 'users', user.uid, 'scans', scanId);
     await updateDoc(scanDocRef, { ...updates, updatedAt: serverTimestamp() });
   }, [user]);
 
   const startNewScan = async (targetUrl: string): Promise<string> => {
     if (!user) throw new Error("User not authenticated");
-    if (!isFirebaseConfigured) throw new Error(CONFIG_ERROR_MESSAGE);
+    if (!isFirebaseInitialized) throw new Error(CONFIG_ERROR_MESSAGE);
 
     const newScanRef = await addDoc(collection(db, 'users', user.uid, 'scans'), {
       userId: user.uid,
@@ -195,7 +206,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         userProfile, 
         scans,
         loading, 
-        isFirebaseConfigured,
         logout, 
         registerUser, 
         signInUser, 

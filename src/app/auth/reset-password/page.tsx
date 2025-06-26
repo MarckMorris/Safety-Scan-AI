@@ -23,7 +23,7 @@ type ResetPasswordFormValues = z.infer<typeof resetPasswordSchema>;
 
 export default function ResetPasswordPage() {
   const { toast } = useToast();
-  const { sendPasswordReset, isFirebaseConfigured } = useAuth();
+  const { sendPasswordReset } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
   const [emailSent, setEmailSent] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -72,15 +72,6 @@ export default function ResetPasswordPage() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          {!isFirebaseConfigured && (
-              <Alert variant="destructive" className="mb-6">
-                  <AlertTriangle className="h-4 w-4" />
-                  <AlertTitle>Configuration Error</AlertTitle>
-                  <AlertDescription>
-                      This feature is disabled. The administrator has not configured Firebase.
-                  </AlertDescription>
-              </Alert>
-          )}
           {error && (
               <Alert variant="destructive" className="mb-6">
                   <AlertTriangle className="h-4 w-4" />
@@ -98,13 +89,13 @@ export default function ResetPasswordPage() {
                     <FormItem>
                       <FormLabel>Email Address</FormLabel>
                       <FormControl>
-                        <Input type="email" placeholder="you@example.com" {...field} disabled={isLoading || !isFirebaseConfigured} />
+                        <Input type="email" placeholder="you@example.com" {...field} disabled={isLoading} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
-                <Button type="submit" className="w-full" disabled={isLoading || !isFirebaseConfigured}>
+                <Button type="submit" className="w-full" disabled={isLoading}>
                   {isLoading ? <><Loader2 className="h-4 w-4 animate-spin mr-2" />Sending...</> : "Send Reset Link"}
                 </Button>
               </form>
