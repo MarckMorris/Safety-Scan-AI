@@ -3,3 +3,4 @@
 
 import '@/ai/flows/scan-url-for-vulnerabilities.ts';
 import '@/ai/flows/generate-security-improvement-report.ts';
+import '@/ai/flows/simulate-attack-flow.ts';

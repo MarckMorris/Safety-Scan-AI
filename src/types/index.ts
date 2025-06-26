@@ -37,30 +37,6 @@ export interface Scan {
   updatedAt: Date; // Firestore Timestamps will be converted to Date objects
 }
 
-// Types for Simulated Attack Module (placeholder for now)
-export type AttackType = "sqli" | "xss" | "brute-force" | "header-spoofing" | "rate-limiting";
-
-export interface SimulatedAttackConfig {
-  targetUrl: string;
-  attackType: AttackType;
-}
-
-export interface SimulatedAttackReport {
-  id: string;
-  userId: string;
-  simulationConfig: SimulatedAttackConfig;
-  status: "pending" | "running" | "completed" | "failed";
-  riskLevel?: "Low" | "Medium" | "High" | "Critical";
-  summary: string;
-  findings: Array<{
-    description: string;
-    evidence?: string;
-    mitigation?: string;
-  }>;
-  createdAt: Date;
-  updatedAt: Date;
-}
-
 // Types for AI Patch Suggestion Engine
 export interface AIPatchSuggestion {
   vulnerabilityType: string;

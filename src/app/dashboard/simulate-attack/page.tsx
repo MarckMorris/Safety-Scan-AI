@@ -10,22 +10,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { ShieldQuestion, AlertTriangle, CheckCircle, Loader2, BarChart3, FileText, Info } from "lucide-react";
 import { Progress } from '@/components/ui/progress';
 import { useToast } from '@/hooks/use-toast';
+import { simulateAttack, type SimulateAttackOutput } from '@/ai/flows/simulate-attack-flow';
 
 type AttackType = "sqli" | "xss" | "brute-force" | "header-spoofing" | "rate-limiting";
-
-interface SimulationResult {
-  attackType: string;
-  target: string;
-  status: "success" | "failed" | "error" | "no_vulnerability";
-  summary: string;
-  details?: string[]; // Specific findings or exposed areas
-  recommendations?: string[];
-  riskLevel?: "Low" | "Medium" | "High" | "Critical"; // For risk gauge
-}
+type SimulationResult = SimulateAttackOutput;
 
 export default function SimulateAttackPage() {
   const { toast } = useToast();
-  const [targetUrl, setTargetUrl] = useState("https://example.com"); // Default or last used
+  const [targetUrl, setTargetUrl] = useState("https://example.com");
   const [attackType, setAttackType] = useState<AttackType>("sqli");
   const [isLoading, setIsLoading] = useState(false);
   const [simulationResult, setSimulationResult] = useState<SimulationResult | null>(null);
@@ -48,55 +40,22 @@ export default function SimulateAttackPage() {
     setSimulationResult(null);
     setProgress(0);
 
-    // Simulate progress
-    const interval = setInterval(() => {
-      setProgress(prev => (prev >= 90 ? 90 : prev + 10));
-    }, 300);
-    
-    // Simulate API call to backend for actual simulation
-    await new Promise(resolve => setTimeout(resolve, 3000 + Math.random() * 2000));
-    clearInterval(interval);
-    setProgress(100);
+    const progressInterval = setInterval(() => {
+        setProgress((prev) => (prev >= 90 ? 90 : prev + Math.floor(Math.random() * 5 + 5)));
+    }, 500);
 
-    // Mock result based on attack type for demonstration
-    let mockResult: SimulationResult;
-    const isVulnerable = Math.random() > 0.5; // 50% chance of finding a vulnerability
-
-    switch (attackType) {
-      case "sqli":
-        mockResult = {
-          attackType: "SQL Injection", target: targetUrl,
-          status: isVulnerable ? "success" : "no_vulnerability",
-          summary: isVulnerable ? `Potential SQL Injection point found at ${targetUrl}/login.` : `No direct SQL Injection vectors identified during basic check.`,
-          details: isVulnerable ? ["Parameter 'username' seems injectable.", "Error-based SQLi pattern observed."] : ["Standard input sanitization appears to be in place for tested forms."],
-          recommendations: isVulnerable ? ["Implement parameterized queries.", "Use an ORM.", "Validate all user inputs strictly."] : ["Continue using prepared statements and ORM.", "Regularly review code for new injection points."],
-          riskLevel: isVulnerable ? "Critical" : "Low",
-        };
-        break;
-      case "xss":
-        mockResult = {
-          attackType: "Cross-Site Scripting", target: targetUrl,
-          status: isVulnerable ? "success" : "no_vulnerability",
-          summary: isVulnerable ? `Reflected XSS possible via query parameter 'search'.` : `No obvious XSS vulnerabilities found in common inputs.`,
-          details: isVulnerable ? ["Payload `<script>alert(1)</script>` executed in page context."] : ["Content Security Policy (CSP) seems to be active.", "Outputs appear to be encoded."],
-          recommendations: isVulnerable ? ["Implement robust output encoding (e.g., OWASP ESAPI).", "Use a strong Content Security Policy."] : ["Maintain and update CSP.", "Sanitize user inputs where they are reflected."],
-          riskLevel: isVulnerable ? "High" : "Low",
-        };
-        break;
-      default:
-        mockResult = {
-          attackType: attackTypes.find(at => at.value === attackType)?.label || "Unknown Attack", target: targetUrl,
-          status: isVulnerable ? "success" : "no_vulnerability",
-          summary: isVulnerable ? `Simulation indicates potential weakness to ${attackType}.` : `Basic simulation for ${attackType} did not reveal immediate issues.`,
-          details: isVulnerable ? ["Specific simulated payloads were successful (details omitted for mock)."] : ["Standard defenses against this attack type seem present."],
-          recommendations: isVulnerable ? ["Review specific controls for this attack vector.", "Conduct deeper penetration testing."] : ["Continue security best practices.", "Monitor for new attack patterns."],
-          riskLevel: isVulnerable ? "Medium" : "Low",
-        };
+    try {
+        const result = await simulateAttack({ targetUrl, attackType });
+        setSimulationResult(result);
+        toast({ title: "Simulation Complete", description: `AI analysis for ${result.attackType} on ${targetUrl} finished.`});
+    } catch (error: any) {
+        console.error("Simulation failed:", error);
+        toast({ title: "Simulation Failed", description: error.message || "An unknown error occurred.", variant: "destructive" });
+    } finally {
+        clearInterval(progressInterval);
+        setProgress(100);
+        setIsLoading(false);
     }
-    
-    setSimulationResult(mockResult);
-    setIsLoading(false);
-    toast({ title: "Simulation Complete (Mock)", description: `Mock simulation for ${mockResult.attackType} on ${targetUrl} finished.`});
   };
 
   const getRiskColor = (level?: "Low" | "Medium" | "High" | "Critical"): string => {
@@ -116,14 +75,14 @@ export default function SimulateAttackPage() {
         <h1 className="text-3xl font-bold tracking-tight font-headline">Simulated Attack Module</h1>
         <p className="text-muted-foreground">
           Safely simulate common attack vectors against your application to identify weaknesses.
-          <span className="block text-xs text-amber-600 mt-1"><Info className="inline h-3 w-3 mr-1"/>All simulations are high-level and non-destructive for demonstration.</span>
+          <span className="block text-xs text-amber-600 mt-1"><Info className="inline h-3 w-3 mr-1"/>All simulations are performed by an AI and are non-destructive. No real attacks are launched.</span>
         </p>
       </div>
 
       <Card className="shadow-lg">
         <CardHeader>
           <CardTitle>Configure Simulation</CardTitle>
-          <CardDescription>Select an attack type and target URL to begin the simulation.</CardDescription>
+          <CardDescription>Select an attack type and target URL to begin the AI-powered simulation.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
           <div className="space-y-2">
@@ -159,7 +118,7 @@ export default function SimulateAttackPage() {
         <CardFooter>
           <Button onClick={handleSimulateAttack} disabled={isLoading} className="w-full md:w-auto">
             {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ShieldQuestion className="mr-2 h-4 w-4" />}
-            Start Simulation (Mock)
+            Start AI Simulation
           </Button>
         </CardFooter>
       </Card>
@@ -168,9 +127,9 @@ export default function SimulateAttackPage() {
         <Card>
           <CardContent className="pt-6 text-center">
             <Loader2 className="h-8 w-8 animate-spin text-primary mx-auto mb-4" />
-            <p className="text-muted-foreground mb-2">Simulating {attackTypes.find(at => at.value === attackType)?.label} on {targetUrl}...</p>
+            <p className="text-muted-foreground mb-2">AI is simulating {attackTypes.find(at => at.value === attackType)?.label} on {targetUrl}...</p>
             <Progress value={progress} className="w-full" />
-             <p className="text-xs text-muted-foreground mt-2">This is a mock simulation and may take a few moments.</p>
+             <p className="text-xs text-muted-foreground mt-2">This may take a moment.</p>
           </CardContent>
         </Card>
       )}
@@ -220,7 +179,7 @@ export default function SimulateAttackPage() {
 
             {simulationResult.details && simulationResult.details.length > 0 && (
               <div>
-                <h4 className="font-semibold mb-1">Details / Exposed Areas:</h4>
+                <h4 className="font-semibold mb-1">Details / Hypothetical Findings:</h4>
                 <ul className="list-disc list-inside text-sm text-muted-foreground space-y-1 pl-2">
                   {simulationResult.details.map((detail, index) => <li key={index}>{detail}</li>)}
                 </ul>
