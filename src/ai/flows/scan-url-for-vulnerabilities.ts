@@ -27,7 +27,7 @@ const ScanUrlForVulnerabilitiesOutputSchema = z.object({
         .enum(['Low', 'Medium', 'High', 'Critical'])
         .describe('The severity of the vulnerability.'),
       description: z.string().describe('A detailed description of the potential vulnerability, how it could be exploited, and why it is a risk.'),
-      affectedUrl: z.string().url().optional().describe('The specific URL or URL pattern that is potentially affected.'),
+      affectedUrl: z.string().optional().describe('The specific URL or URL pattern that is potentially affected.'),
       affectedFile: z.string().optional().describe('A hypothetical file path that could be vulnerable (e.g., /login.php, /api/users).'),
     })
   ).describe('A list of potential vulnerabilities identified through analysis.'),
