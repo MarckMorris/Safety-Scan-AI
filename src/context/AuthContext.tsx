@@ -11,12 +11,14 @@ import { scanUrlForVulnerabilities } from '@/ai/flows/scan-url-for-vulnerabiliti
 
 const CONFIG_ERROR_MESSAGE = "Firebase configuration is invalid. Please check your .env.local file and restart the development server.";
 
+type AuthErrorState = { code: string; message: string } | null;
+
 interface AuthContextType {
   user: FirebaseUser | null;
   userProfile: UserProfile | null;
   scans: Scan[];
   loading: boolean;
-  authError: string | null; // For database connection errors
+  authError: AuthErrorState;
   logout: () => Promise<void>;
   registerUser: (displayName: string, email: string, password: string) => Promise<{ error?: string }>;
   signInUser: (email: string, password: string) => Promise<{ error?: string }>;
@@ -33,13 +35,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [scans, setScans] = useState<Scan[]>([]);
   const [loading, setLoading] = useState(true);
-  const [authError, setAuthError] = useState<string | null>(null);
+  const [authError, setAuthError] = useState<AuthErrorState>(null);
   const router = useRouter();
 
   useEffect(() => {
     if (!isFirebaseInitialized) {
       console.error(CONFIG_ERROR_MESSAGE);
-      setAuthError(CONFIG_ERROR_MESSAGE);
+      setAuthError({ code: 'firebase-config-invalid', message: CONFIG_ERROR_MESSAGE });
       setLoading(false);
       return;
     }
@@ -67,13 +69,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             }
         } catch (error: any) {
             console.error("Firestore Error:", error);
-            let friendlyError = "Could not connect to the database. This can happen if Firestore is not enabled in your Firebase project.";
-            
             if (error.code === 'permission-denied') {
-                friendlyError = "PERMISSION_DENIED: Your security rules are blocking access. You need to deploy the provided Firestore rules.";
+                setAuthError({
+                    code: 'firestore-permission-denied',
+                    message: "PERMISSION_DENIED: Your security rules are blocking access. You need to deploy the provided Firestore rules."
+                });
+            } else {
+                setAuthError({
+                    code: 'firestore-not-found',
+                    message: 'Could not connect to the database. This can happen if Firestore is not enabled in your Firebase project.'
+                });
             }
-        
-            setAuthError(friendlyError);
             setUserProfile(null);
         }
       } else {
@@ -107,8 +113,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         setScans(userScans);
       }, (error) => {
         console.error("Error fetching scans:", error);
-        const friendlyError = "Could not fetch scan history from the database. Please check your Firestore security rules.";
-        setAuthError(friendlyError);
+        setAuthError({
+            code: 'firestore-scan-history-failed',
+            message: 'Could not fetch scan history from the database. Please check your Firestore security rules.'
+        });
         if (error.code === 'failed-precondition') {
             console.error("This can happen if Firestore indexes are not set up.");
         }

@@ -23,9 +23,7 @@ const ProtectedRoute = ({ children }: ProtectedRouteProps): JSX.Element | null =
   }, [user, loading, router, authError]);
 
   if (authError) {
-    const isPermissionError = authError.startsWith('PERMISSION_DENIED');
-
-    if (isPermissionError) {
+    if (authError.code === 'firestore-permission-denied') {
       return (
         <div className="flex flex-col items-center justify-center min-h-screen p-4 text-center">
           <div className="max-w-lg p-8 bg-card border rounded-lg shadow-lg">
@@ -63,7 +61,7 @@ const ProtectedRoute = ({ children }: ProtectedRouteProps): JSX.Element | null =
         <div className="max-w-md p-8 bg-card border rounded-lg shadow-lg">
             <AlertTriangle className="h-12 w-12 text-destructive mx-auto mb-4" />
             <h1 className="text-2xl font-bold text-destructive">Database Setup Required</h1>
-            <p className="mt-2 text-muted-foreground">{authError}</p>
+            <p className="mt-2 text-muted-foreground">{authError.message}</p>
             <div className="mt-4 text-sm text-left text-card-foreground space-y-2">
                 <p>To fix this, you need to create a Firestore database in your Firebase project:</p>
                 <ol className="list-decimal list-inside space-y-1 bg-secondary/50 p-3 rounded-md">
