@@ -44,20 +44,27 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (user) {
         setUser(user);
-        const userDocRef = doc(db, 'users', user.uid);
-        const userDocSnap = await getDoc(userDocRef);
-        if (userDocSnap.exists()) {
-          setUserProfile(userDocSnap.data() as UserProfile);
-        } else {
-          // Handle case where user exists in Auth but not Firestore
-          const newUserProfile: UserProfile = {
-            uid: user.uid,
-            email: user.email,
-            displayName: user.displayName,
-            role: 'user',
-          };
-          await setDoc(userDocRef, newUserProfile);
-          setUserProfile(newUserProfile);
+        try {
+            const userDocRef = doc(db, 'users', user.uid);
+            const userDocSnap = await getDoc(userDocRef);
+            if (userDocSnap.exists()) {
+              setUserProfile(userDocSnap.data() as UserProfile);
+            } else {
+              // Handle case where user exists in Auth but not Firestore
+              const newUserProfile: UserProfile = {
+                uid: user.uid,
+                email: user.email,
+                displayName: user.displayName,
+                role: 'user',
+              };
+              await setDoc(userDocRef, newUserProfile);
+              setUserProfile(newUserProfile);
+            }
+        } catch (error) {
+            console.error("Firestore Error: Failed to get user document.", error);
+            console.error("This may be due to Firestore not being enabled in your Firebase project, or incorrect security rules. Please check the Firebase console.");
+            // Prevent app from being stuck in a loading state
+            setUserProfile(null);
         }
       } else {
         setUser(null);
