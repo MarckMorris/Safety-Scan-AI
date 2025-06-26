@@ -3,5 +3,6 @@ import {googleAI} from '@genkit-ai/googleai';
 
 export const ai = genkit({
   plugins: [googleAI()],
-  model: 'googleai/gemini-2.0-flash',
+  // Use a valid and recent text model. 'gemini-1.5-flash-latest' is a good choice for speed and capability.
+  model: 'googleai/gemini-1.5-flash-latest',
 });

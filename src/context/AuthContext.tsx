@@ -36,6 +36,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   useEffect(() => {
     if (!isFirebaseInitialized) {
+      console.error(CONFIG_ERROR_MESSAGE);
       setLoading(false);
       return;
     }
@@ -104,8 +105,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const registerUser = async (displayName: string, email: string, password: string) => {
+    if (!isFirebaseInitialized) {
+      return { error: CONFIG_ERROR_MESSAGE };
+    }
     try {
-      if (!isFirebaseInitialized) throw new Error('auth/configuration-not-found');
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       const firebaseUser = userCredential.user;
       await updateProfile(firebaseUser, { displayName });
@@ -119,7 +122,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       await setDoc(doc(db, 'users', firebaseUser.uid), userProfileData);
       return {};
     } catch (error: any) {
-      if (error.code === 'auth/configuration-not-found') {
+       if (error.code === 'auth/configuration-not-found') {
         return { error: CONFIG_ERROR_MESSAGE };
       }
       return { error: error.message };
@@ -127,8 +130,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const signInUser = async (email: string, password: string) => {
+    if (!isFirebaseInitialized) {
+      return { error: CONFIG_ERROR_MESSAGE };
+    }
     try {
-      if (!isFirebaseInitialized) throw new Error('auth/configuration-not-found');
       await signInWithEmailAndPassword(auth, email, password);
       return {};
     } catch (error: any) {
@@ -140,8 +145,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const sendPasswordReset = async (email: string) => {
+    if (!isFirebaseInitialized) {
+      return { error: CONFIG_ERROR_MESSAGE };
+    }
     try {
-      if (!isFirebaseInitialized) throw new Error('auth/configuration-not-found');
       await sendPasswordResetEmail(auth, email);
       return {};
     } catch (error: any) {
@@ -161,6 +168,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         }
         const userDocRef = doc(db, 'users', user.uid);
         await updateDoc(userDocRef, updates);
+        setUserProfile(prev => prev ? { ...prev, ...updates } : null);
         return {};
     } catch(error: any) {
         return {error: error.message};
@@ -190,6 +198,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         try {
             await updateScan(newScanRef.id, { status: 'scanning' });
             const aiScanResult: AIScanResult = await scanUrlForVulnerabilities({ url: targetUrl });
+            console.log(`AI Scan successful for ${newScanRef.id}`, aiScanResult);
             await updateScan(newScanRef.id, { status: 'completed', aiScanResult });
         } catch (error: any) {
             console.error(`Error during scan for ${newScanRef.id}:`, error);
