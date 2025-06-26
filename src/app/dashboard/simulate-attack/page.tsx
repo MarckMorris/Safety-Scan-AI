@@ -90,7 +90,6 @@ export default function SimulateAttackPage() {
         <h1 className="text-3xl font-bold tracking-tight font-headline">Simulated Attack Module</h1>
         <p className="text-muted-foreground">
           Safely simulate common attack vectors against your application to identify weaknesses.
-          <span className="block text-xs text-amber-600 mt-1"><Info className="inline h-3 w-3 mr-1"/>All simulations are performed by an AI and are non-destructive. No real attacks are launched.</span>
         </p>
       </div>
 
