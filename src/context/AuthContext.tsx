@@ -66,8 +66,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
               setUserProfile(newUserProfile);
             }
         } catch (error: any) {
-            console.error("Firestore Error: Failed to get user document.", error);
-            const friendlyError = "Could not connect to the database. This can happen if Firestore is not enabled in your Firebase project or if security rules are blocking access.";
+            console.error("Firestore Error:", error);
+            let friendlyError = "Could not connect to the database. This can happen if Firestore is not enabled in your Firebase project.";
+            
+            if (error.code === 'permission-denied') {
+                friendlyError = "PERMISSION_DENIED: Your security rules are blocking access. You need to deploy the provided Firestore rules.";
+            }
+        
             setAuthError(friendlyError);
             setUserProfile(null);
         }
