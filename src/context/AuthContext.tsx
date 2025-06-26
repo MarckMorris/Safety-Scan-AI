@@ -2,7 +2,7 @@
 "use client";
 
 import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
-import type { User } from 'firebase/auth';
+import type { User, Auth } from 'firebase/auth';
 import { 
   onAuthStateChanged, 
   signOut as firebaseSignOut,
@@ -11,18 +11,16 @@ import {
   sendPasswordResetEmail,
   updateProfile
 } from 'firebase/auth';
-import { doc, getDoc, setDoc } from 'firebase/firestore';
-import { auth, db, isFirebaseInitialized } from '@/lib/firebase'; // Import the flag
+import { doc, getDoc, setDoc, Firestore } from 'firebase/firestore';
+import { auth, db, isFirebaseInitialized } from '@/lib/firebase';
 import type { UserProfile } from '@/types';
 import { useRouter } from 'next/navigation';
 
-// Define the shape of the new functions we'll provide
 interface AuthContextType {
   user: User | null;
   userProfile: UserProfile | null;
   loading: boolean;
   logout: () => Promise<void>;
-  // New auth service functions
   registerUser: (displayName: string, email: string, password: string) => Promise<{ error?: string }>;
   signInUser: (email: string, password: string) => Promise<{ error?: string }>;
   sendPasswordReset: (email: string) => Promise<{ error?: string }>;
@@ -39,7 +37,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const router = useRouter();
 
   useEffect(() => {
-    // This check is important for the initial load. If firebase isn't configured, we stop loading and show an unauthenticated state.
     if (!isFirebaseInitialized) {
       setLoading(false);
       return;
@@ -48,7 +45,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {
         setUser(firebaseUser);
-        const userDocRef = doc(db, "users", firebaseUser.uid);
+        const userDocRef = doc(db as Firestore, "users", firebaseUser.uid);
         const docSnap = await getDoc(userDocRef);
         if (docSnap.exists()) {
           setUserProfile(docSnap.data() as UserProfile);
@@ -75,7 +72,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const logout = async () => {
     if (!isFirebaseInitialized) return;
     try {
-      await firebaseSignOut(auth);
+      await firebaseSignOut(auth as Auth);
       router.push('/auth/login');
     } catch (error) {
       console.error("Error signing out: ", error);
@@ -83,10 +80,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const registerUser = async (displayName: string, email: string, password: string) => {
-    if (!isFirebaseInitialized || !auth || !db) {
-      return { error: CONFIG_ERROR_MESSAGE };
-    }
     try {
+      if (!auth || !db) {
+        return { error: CONFIG_ERROR_MESSAGE };
+      }
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       const user = userCredential.user;
 
@@ -100,7 +97,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       };
       await setDoc(doc(db, "users", user.uid), userProfileData);
 
-      // onAuthStateChanged will handle redirect
       return {};
     } catch (error: any) {
       console.error("Registration error", error);
@@ -115,12 +111,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const signInUser = async (email: string, password: string) => {
-    if (!isFirebaseInitialized || !auth) {
-      return { error: CONFIG_ERROR_MESSAGE };
-    }
     try {
+      if (!auth) {
+        return { error: CONFIG_ERROR_MESSAGE };
+      }
       await signInWithEmailAndPassword(auth, email, password);
-      // onAuthStateChanged will handle redirect
       return {};
     } catch (error: any) {
       console.error("Login error", error);
@@ -135,10 +130,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
   
   const sendPasswordReset = async (email: string) => {
-    if (!isFirebaseInitialized || !auth) {
-      return { error: CONFIG_ERROR_MESSAGE };
-    }
     try {
+       if (!auth) {
+        return { error: CONFIG_ERROR_MESSAGE };
+      }
       await sendPasswordResetEmail(auth, email);
       return {};
     } catch (error: any) {
