@@ -1,3 +1,4 @@
+
 'use server';
 /**
  * @fileOverview Simulates a security attack against a URL using AI analysis.
@@ -20,13 +21,13 @@ const attackTypeDescriptions: Record<string, string> = {
     "rate-limiting": "Rate Limiting / Denial of Service: Test how the server responds to a high volume of requests."
 };
 
-export const SimulateAttackInputSchema = z.object({
+const SimulateAttackInputSchema = z.object({
   targetUrl: z.string().url().describe('The URL to simulate an attack against.'),
   attackType: z.enum(["sqli", "xss", "brute-force", "header-spoofing", "rate-limiting"]).describe("The type of attack to simulate."),
 });
 export type SimulateAttackInput = z.infer<typeof SimulateAttackInputSchema>;
 
-export const SimulateAttackOutputSchema = z.object({
+const SimulateAttackOutputSchema = z.object({
     attackType: z.string().describe('The full name of the attack that was simulated (e.g., "SQL Injection").'),
     target: z.string().url().describe('The target URL that was analyzed.'),
     status: z.enum(["success", "failed", "error", "no_vulnerability"]).describe("The outcome of the simulation. 'success' means a vulnerability was likely found, 'no_vulnerability' means it was likely secure."),
