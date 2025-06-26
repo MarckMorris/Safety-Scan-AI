@@ -23,13 +23,15 @@ const attackTypeDescriptions: Record<string, string> = {
 
 const SimulateAttackInputSchema = z.object({
   targetUrl: z.string().url().describe('The URL to simulate an attack against.'),
-  attackType: z.enum(["sqli", "xss", "brute-force", "header-spoofing", "rate-limiting"]).describe("The type of attack to simulate."),
+  attackType: z.enum(["sqli", "xss", "brute-force", "header-spoofing", "rate-limiting"], {
+    required_error: "You need to select an attack type.",
+  }),
 });
 export type SimulateAttackInput = z.infer<typeof SimulateAttackInputSchema>;
 
 const SimulateAttackOutputSchema = z.object({
     attackType: z.string().describe('The full name of the attack that was simulated (e.g., "SQL Injection").'),
-    target: z.string().url().describe('The target URL that was analyzed.'),
+    target: z.string().describe('The target URL that was analyzed.'),
     status: z.enum(["success", "failed", "error", "no_vulnerability"]).describe("The outcome of the simulation. 'success' means a vulnerability was likely found, 'no_vulnerability' means it was likely secure."),
     summary: z.string().describe("A concise, one-sentence summary of the simulation's outcome."),
     details: z.array(z.string()).optional().describe("A list of specific findings, attack vectors, or exposed areas identified during the simulation."),
