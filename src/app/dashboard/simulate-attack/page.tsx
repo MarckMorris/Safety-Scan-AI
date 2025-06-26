@@ -2,8 +2,12 @@
 "use client";
 
 import { useState } from 'react';
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useForm } from "react-hook-form";
+import * as z from "zod";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -15,13 +19,28 @@ import { simulateAttack, type SimulateAttackOutput } from '@/ai/flows/simulate-a
 type AttackType = "sqli" | "xss" | "brute-force" | "header-spoofing" | "rate-limiting";
 type SimulationResult = SimulateAttackOutput;
 
+const simulationFormSchema = z.object({
+  targetUrl: z.string().url({ message: "Please enter a single, valid URL." }),
+  attackType: z.enum(["sqli", "xss", "brute-force", "header-spoofing", "rate-limiting"], {
+    required_error: "You need to select an attack type.",
+  }),
+});
+
+type SimulationFormValues = z.infer<typeof simulationFormSchema>;
+
 export default function SimulateAttackPage() {
   const { toast } = useToast();
-  const [targetUrl, setTargetUrl] = useState("https://example.com");
-  const [attackType, setAttackType] = useState<AttackType>("sqli");
   const [isLoading, setIsLoading] = useState(false);
   const [simulationResult, setSimulationResult] = useState<SimulationResult | null>(null);
   const [progress, setProgress] = useState(0);
+
+  const form = useForm<SimulationFormValues>({
+    resolver: zodResolver(simulationFormSchema),
+    defaultValues: {
+      targetUrl: "https://example.com",
+      attackType: "sqli",
+    },
+  });
 
   const attackTypes: { value: AttackType; label: string; description: string }[] = [
     { value: "sqli", label: "SQL Injection", description: "Test for vulnerabilities allowing SQL command execution." },
@@ -31,11 +50,7 @@ export default function SimulateAttackPage() {
     { value: "rate-limiting", label: "Rate Limiting (DoS Simulation)", description: "Lightly test server response under repeated requests." },
   ];
 
-  const handleSimulateAttack = async () => {
-    if (!targetUrl) {
-      toast({ title: "Target URL Required", description: "Please enter a URL to simulate an attack on.", variant: "destructive" });
-      return;
-    }
+  const onSubmit = async (data: SimulationFormValues) => {
     setIsLoading(true);
     setSimulationResult(null);
     setProgress(0);
@@ -45,9 +60,9 @@ export default function SimulateAttackPage() {
     }, 500);
 
     try {
-        const result = await simulateAttack({ targetUrl, attackType });
+        const result = await simulateAttack({ targetUrl: data.targetUrl, attackType: data.attackType });
         setSimulationResult(result);
-        toast({ title: "Simulation Complete", description: `AI analysis for ${result.attackType} on ${targetUrl} finished.`});
+        toast({ title: "Simulation Complete", description: `AI analysis for ${result.attackType} on ${data.targetUrl} finished.`});
     } catch (error: any) {
         console.error("Simulation failed:", error);
         toast({ title: "Simulation Failed", description: error.message || "An unknown error occurred.", variant: "destructive" });
@@ -84,50 +99,62 @@ export default function SimulateAttackPage() {
           <CardTitle>Configure Simulation</CardTitle>
           <CardDescription>Select an attack type and target URL to begin the AI-powered simulation.</CardDescription>
         </CardHeader>
-        <CardContent className="space-y-6">
-          <div className="space-y-2">
-            <Label htmlFor="targetUrl">Target URL</Label>
-            <Input 
-              id="targetUrl" 
-              placeholder="https://yourapp.com/login" 
-              value={targetUrl}
-              onChange={(e) => setTargetUrl(e.target.value)}
-              disabled={isLoading}
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="attackType">Attack Type</Label>
-            <Select 
-              value={attackType} 
-              onValueChange={(value) => setAttackType(value as AttackType)}
-              disabled={isLoading}
-            >
-              <SelectTrigger id="attackType">
-                <SelectValue placeholder="Select an attack type" />
-              </SelectTrigger>
-              <SelectContent>
-                {attackTypes.map((type) => (
-                  <SelectItem key={type.value} value={type.value}>
-                    {type.label} - <span className="text-xs text-muted-foreground">{type.description}</span>
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        </CardContent>
-        <CardFooter>
-          <Button onClick={handleSimulateAttack} disabled={isLoading} className="w-full md:w-auto">
-            {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ShieldQuestion className="mr-2 h-4 w-4" />}
-            Start AI Simulation
-          </Button>
-        </CardFooter>
+        <Form {...form}>
+            <form onSubmit={form.handleSubmit(onSubmit)}>
+                <CardContent className="space-y-6">
+                    <FormField
+                      control={form.control}
+                      name="targetUrl"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Target URL</FormLabel>
+                          <FormControl>
+                            <Input placeholder="https://yourapp.com/login" {...field} disabled={isLoading} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="attackType"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Attack Type</FormLabel>
+                          <Select onValueChange={field.onChange} defaultValue={field.value} disabled={isLoading}>
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Select an attack type" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              {attackTypes.map((type) => (
+                                <SelectItem key={type.value} value={type.value}>
+                                  {type.label} - <span className="text-xs text-muted-foreground">{type.description}</span>
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                </CardContent>
+                <CardFooter>
+                  <Button type="submit" disabled={isLoading} className="w-full md:w-auto">
+                    {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ShieldQuestion className="mr-2 h-4 w-4" />}
+                    Start AI Simulation
+                  </Button>
+                </CardFooter>
+            </form>
+        </Form>
       </Card>
 
       {isLoading && (
         <Card>
           <CardContent className="pt-6 text-center">
             <Loader2 className="h-8 w-8 animate-spin text-primary mx-auto mb-4" />
-            <p className="text-muted-foreground mb-2">AI is simulating {attackTypes.find(at => at.value === attackType)?.label} on {targetUrl}...</p>
+            <p className="text-muted-foreground mb-2">AI is simulating {attackTypes.find(at => at.value === form.getValues().attackType)?.label} on {form.getValues().targetUrl}...</p>
             <Progress value={progress} className="w-full" />
              <p className="text-xs text-muted-foreground mt-2">This may take a moment.</p>
           </CardContent>
