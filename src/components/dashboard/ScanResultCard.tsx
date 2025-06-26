@@ -54,16 +54,16 @@ export default function ScanResultCard({ scan }: ScanResultCardProps) {
   return (
     <Card className="shadow-lg hover:shadow-xl transition-shadow duration-300 flex flex-col h-full">
       <CardHeader>
-        <div className="flex justify-between items-start">
-            <div>
+        <div className="flex justify-between items-start gap-2">
+            <div className="min-w-0">
                 <CardTitle className="text-lg font-headline truncate" title={scan.targetUrl}>
-                    {scan.targetUrl.length > 40 ? `${scan.targetUrl.substring(0, 37)}...` : scan.targetUrl}
+                    {scan.targetUrl}
                 </CardTitle>
                 <CardDescription>
                 {scan.createdAt ? `Scanned ${formatDistanceToNow(scan.createdAt, { addSuffix: true })}` : 'Scan date unavailable'}
                 </CardDescription>
             </div>
-            <Badge variant={getStatusBadgeVariant(scan.status)} className="capitalize flex items-center gap-1.5 text-xs px-2 py-1">
+            <Badge variant={getStatusBadgeVariant(scan.status)} className="capitalize flex-shrink-0 flex items-center gap-1.5 text-xs px-2 py-1">
                 {getStatusIcon(scan.status)}
                 <span>{scan.status.replace('_', ' ')}</span>
             </Badge>
