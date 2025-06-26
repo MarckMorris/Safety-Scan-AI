@@ -4,19 +4,42 @@
 import ScanForm from "@/components/dashboard/ScanForm";
 import { useAuth } from "@/context/AuthContext";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { Activity, AlertTriangle, CheckCircle2, History, Bot, FileText, ShieldQuestion } from "lucide-react";
+import { AlertTriangle, History, Bot, ShieldQuestion } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
+import { useMemo } from "react";
 
 export default function DashboardOverviewPage() {
-  const { userProfile } = useAuth();
+  const { userProfile, scans } = useAuth();
 
-  // Placeholder data for summary cards - in a real app, this would be fetched
+  const summaryStatsData = useMemo(() => {
+    const totalScans = scans.length;
+
+    const criticalVulnerabilities = scans.reduce((count, scan) => {
+      if (scan.aiScanResult?.vulnerabilities) {
+        return count + scan.aiScanResult.vulnerabilities.filter(v => v.severity === 'Critical').length;
+      }
+      return count;
+    }, 0);
+
+    const recommendationsPending = scans.filter(scan => scan.status === 'completed' && !scan.aiSecurityReport).length;
+    
+    // This is a placeholder as simulated attacks are not stored in the database yet.
+    const simulatedAttacksRun = 0; 
+
+    return {
+      totalScans,
+      criticalVulnerabilities,
+      recommendationsPending,
+      simulatedAttacksRun,
+    };
+  }, [scans]);
+
   const summaryStats = [
-    { title: "Total Scans Conducted", value: "0", icon: <History className="w-6 h-6 text-primary" />, color: "text-primary", link: "/dashboard/scans" },
-    { title: "Critical Vulnerabilities (Active)", value: "0", icon: <AlertTriangle className="w-6 h-6 text-destructive" />, color: "text-destructive", link: "/dashboard/scans?severity=Critical" },
-    { title: "AI Recommendations Pending", value: "0", icon: <Bot className="w-6 h-6 text-blue-500" />, color: "text-blue-500", link: "/dashboard/scans?status=pending_report" },
-    { title: "Simulated Attacks Run", value: "0", icon: <ShieldQuestion className="w-6 h-6 text-orange-500" />, color: "text-orange-500", link: "/dashboard/simulate-attack" },
+    { title: "Total Scans Conducted", value: summaryStatsData.totalScans.toString(), icon: <History className="w-6 h-6 text-primary" />, color: "text-primary", link: "/dashboard/scans" },
+    { title: "Critical Vulnerabilities (Active)", value: summaryStatsData.criticalVulnerabilities.toString(), icon: <AlertTriangle className="w-6 h-6 text-destructive" />, color: "text-destructive", link: "/dashboard/scans?severity=Critical" },
+    { title: "AI Recommendations Pending", value: summaryStatsData.recommendationsPending.toString(), icon: <Bot className="w-6 h-6 text-blue-500" />, color: "text-blue-500", link: "/dashboard/scans?status=completed" },
+    { title: "Simulated Attacks Run", value: summaryStatsData.simulatedAttacksRun.toString(), icon: <ShieldQuestion className="w-6 h-6 text-orange-500" />, color: "text-orange-500", link: "/dashboard/simulate-attack" },
   ];
 
   return (
