@@ -11,9 +11,6 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { useEffect, useState } from "react";
-import { updateProfile as firebaseUpdateProfile, updateEmail, sendPasswordResetEmail, reauthenticateWithCredential, EmailAuthProvider } from "firebase/auth"; 
-import { doc, updateDoc } from "firebase/firestore"; 
-import { auth, db } from "@/lib/firebase"; 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Loader2 } from "lucide-react";
 
@@ -25,7 +22,7 @@ const profileSchema = z.object({
 type ProfileFormValues = z.infer<typeof profileSchema>;
 
 export default function AccountPage() {
-  const { user, userProfile, loading: authLoading, logout } = useAuth();
+  const { user, userProfile, loading: authLoading, logout, updateUserProfile, sendPasswordReset } = useAuth();
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
 
@@ -53,64 +50,33 @@ export default function AccountPage() {
     }
     setIsLoading(true);
     
-    try {
-      // Update Firebase Auth profile
-      if (data.displayName !== user.displayName) {
-        await firebaseUpdateProfile(user, { displayName: data.displayName });
-      }
-      
-      if (data.email !== user.email) {
-        // Updating email in Firebase Auth is a sensitive operation and often requires re-authentication.
-        // For simplicity, we'll show a toast. A real app might prompt for password.
-        // await updateEmail(user, data.email); // This would require re-authentication.
-        toast({ 
-            title: "Email Update Notice", 
-            description: "To change your email address, Firebase requires re-authentication. This feature is simplified in this version. Your email in Auth was not changed.",
-            variant: "default" 
+    const { error } = await updateUserProfile({ displayName: data.displayName });
+
+    if (error) {
+        toast({
+            title: "Update Failed",
+            description: error,
+            variant: "destructive",
         });
-      }
-
-      // Update Firestore profile
-      const userDocRef = doc(db, "users", user.uid);
-      await updateDoc(userDocRef, { 
-        displayName: data.displayName,
-        // email: data.email, // Also update email in Firestore if it was successfully changed in Auth
-      });
-
-      toast({
-        title: "Profile Updated",
-        description: "Your profile information has been successfully updated.",
-      });
-    } catch (error: any) {
-      console.error("Profile update error", error);
-      toast({
-        title: "Update Failed",
-        description: error.message || "Could not update profile. If changing email, re-authentication might be required.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsLoading(false);
+    } else {
+        toast({
+            title: "Profile Updated",
+            description: "Your display name has been successfully updated.",
+        });
     }
+    
+    setIsLoading(false);
   };
 
   const handlePasswordReset = async () => {
     if (user && user.email) {
       setIsLoading(true);
-      try {
-        await sendPasswordResetEmail(auth, user.email);
-        toast({
-          title: "Password Reset Email Sent",
-          description: "Check your email for instructions to reset your password.",
-        });
-      } catch (error: any) {
-        toast({
-          title: "Error Sending Reset Email",
-          description: error.message,
-          variant: "destructive",
-        });
-      } finally {
-        setIsLoading(false);
-      }
+      await sendPasswordReset(user.email);
+      toast({
+        title: "Password Reset Email Sent (Simulated)",
+        description: "Check your email for instructions to reset your password.",
+      });
+      setIsLoading(false);
     }
   };
 
@@ -166,7 +132,7 @@ export default function AccountPage() {
                       <Input type="email" placeholder="you@example.com" {...field} disabled />
                     </FormControl>
                      <FormMessage />
-                     <p className="text-xs text-muted-foreground pt-1">Changing email requires re-authentication and is simplified here.</p>
+                     <p className="text-xs text-muted-foreground pt-1">Changing email is not supported in the mock environment.</p>
                   </FormItem>
                 )}
               />

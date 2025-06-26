@@ -1,6 +1,4 @@
 
-import type { Timestamp } from 'firebase/firestore';
-
 export interface UserProfile {
   uid: string;
   email: string | null;
@@ -33,8 +31,8 @@ export interface Scan {
   aiScanResult?: AIScanResult | null; // Allow null for initial state
   aiSecurityReport?: AISecurityReport | null; // Allow null
   errorMessage?: string | null; // Allow null
-  createdAt: Timestamp;
-  updatedAt: Timestamp;
+  createdAt: Date;
+  updatedAt: Date;
 }
 
 // Types for Simulated Attack Module (placeholder for now)
@@ -59,8 +57,8 @@ export interface SimulatedAttackReport {
     evidence?: string; // e.g., error message, successful payload
     mitigation?: string;
   }>;
-  createdAt: Timestamp;
-  updatedAt: Timestamp;
+  createdAt: Date;
+  updatedAt: Date;
 }
 
 // Types for AI Patch Suggestion Engine

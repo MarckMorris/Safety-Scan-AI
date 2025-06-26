@@ -46,8 +46,8 @@ export default function ResetPasswordPage() {
       setError(resetError);
     } else {
       toast({
-        title: "Password Reset Email Sent",
-        description: "Please check your inbox for instructions to reset your password.",
+        title: "Password Reset Email Sent (Simulated)",
+        description: "In a real app, you would check your inbox for instructions.",
       });
       setEmailSent(true);
     }
@@ -67,8 +67,8 @@ export default function ResetPasswordPage() {
           <CardTitle className="text-2xl font-headline">Reset Your Password</CardTitle>
           <CardDescription>
             {emailSent 
-              ? "Check your email for the reset link." 
-              : "Enter your email address and we&apos;ll send you a link to reset your password."}
+              ? "Check your email for the reset link (this is simulated)." 
+              : "Enter your email address and we'll send you a link to reset your password."}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -102,7 +102,7 @@ export default function ResetPasswordPage() {
             </Form>
           ) : (
              <div className="text-center">
-                <p className="text-green-600">A password reset link has been sent to your email address.</p>
+                <p className="text-green-600">A password reset link has been sent to your email address (Simulated).</p>
              </div>
           )}
           <div className="mt-6 text-center text-sm">

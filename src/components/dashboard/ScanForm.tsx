@@ -8,11 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
-import { scanUrlForVulnerabilities } from "@/ai/flows/scan-url-for-vulnerabilities";
-import type { AIScanResult, Scan } from "@/types";
 import { useAuth } from "@/context/AuthContext";
-import { doc, setDoc, serverTimestamp, Timestamp } from "firebase/firestore";
-import { db } from "@/lib/firebase";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../ui/card";
@@ -24,77 +20,9 @@ const scanFormSchema = z.object({
 
 type ScanFormValues = z.infer<typeof scanFormSchema>;
 
-// Asynchronous helper function to perform Firestore operations and AI scan
-const processScanInBackground = async (
-    userId: string,
-    scanId: string,
-    targetUrl: string,
-    initialTimestamps: { createdAt: Timestamp, updatedAt: Timestamp }
-) => {
-    console.log(`[processScanInBackground] Initiated for scan ID: ${scanId}, User: ${userId}, URL: ${targetUrl}`);
-    const scanDocRef = doc(db, "users", userId, "scans", scanId);
-    console.log(`[processScanInBackground] Firestore document path: users/${userId}/scans/${scanId}`);
-
-    let finalScanData: Omit<Scan, 'id'>;
-
-    try {
-        console.log(`[processScanInBackground] Calling AI scan (scanUrlForVulnerabilities) for URL: ${targetUrl}`);
-        const aiScanResult: AIScanResult = await scanUrlForVulnerabilities({ url: targetUrl });
-        console.log(`[processScanInBackground] AI scan COMPLETED for ID: ${scanId}. Result summary: ${aiScanResult?.summary}`);
-
-        finalScanData = {
-            userId,
-            targetUrl,
-            status: "completed",
-            aiScanResult: aiScanResult,
-            aiSecurityReport: null,
-            createdAt: initialTimestamps.createdAt,
-            updatedAt: serverTimestamp(),
-            errorMessage: null,
-        };
-        console.log(`[processScanInBackground] Attempting to set 'completed' document for scan ID: ${scanId}. Data:`, JSON.stringify(finalScanData, null, 2));
-        await setDoc(scanDocRef, finalScanData);
-        console.log(`[processScanInBackground] Firestore document CREATED/SET to 'completed' for ID: ${scanId}`);
-
-    } catch (error: any) {
-        console.error(`[processScanInBackground] CRITICAL ERROR during processing for scan ID ${scanId}:`, error);
-        let errorMessage = "Unknown error during scan processing.";
-        if (error instanceof Error) {
-            errorMessage = error.message;
-            console.error(`[processScanInBackground] Error Name: ${error.name}, Message: ${errorMessage}, Stack: ${error.stack}`);
-        } else {
-            try {
-                errorMessage = JSON.stringify(error);
-            } catch (e) {
-                // Non-serializable error
-            }
-            console.error(`[processScanInBackground] Non-Error object thrown:`, errorMessage);
-        }
-        
-        finalScanData = {
-            userId,
-            targetUrl,
-            status: "failed",
-            aiScanResult: null,
-            aiSecurityReport: null,
-            createdAt: initialTimestamps.createdAt,
-            updatedAt: serverTimestamp(),
-            errorMessage: errorMessage,
-        };
-        console.log(`[processScanInBackground] Attempting to set 'failed' document for scan ID: ${scanId} due to error. Data:`, JSON.stringify(finalScanData, null, 2));
-        try {
-            await setDoc(scanDocRef, finalScanData);
-            console.log(`[processScanInBackground] Firestore document CREATED/SET to 'failed' for ID: ${scanId}`);
-        } catch (setDocError: any) {
-            console.error(`[processScanInBackground] CRITICAL: Failed to set scan doc ${scanId} to 'failed' state after initial error:`, setDocError);
-        }
-    }
-};
-
-
 export default function ScanForm() {
   const { toast } = useToast();
-  const { user } = useAuth(); 
+  const { user, startNewScan } = useAuth(); 
   const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -106,42 +34,22 @@ export default function ScanForm() {
   });
 
   const onSubmit = async (data: ScanFormValues) => {
-    console.log("[ScanForm - onSubmit] Form submitted with data:", data);
-    if (!user || !user.uid) { 
+    if (!user) { 
       toast({ title: "Authentication Error", description: "User not found. Cannot start scan.", variant: "destructive" });
-      console.error("[ScanForm - onSubmit] User or user.uid not found. User object:", user);
-      setIsSubmitting(false);
       return;
     }
 
     setIsSubmitting(true);
     
-    const clientSideScanId = crypto.randomUUID();
-    console.log(`[ScanForm - onSubmit] Generated client-side scan ID: ${clientSideScanId}. User ID: ${user.uid}`);
-    const now = Timestamp.now(); 
-
-    const initialTimestamps = { 
-        createdAt: now,
-        updatedAt: now,
-    };
-    
-    router.push(`/dashboard/scans/${clientSideScanId}?targetUrl=${encodeURIComponent(data.url)}`);
-    console.log(`[ScanForm - onSubmit] Navigated to /dashboard/scans/${clientSideScanId}`);
-        
-    processScanInBackground(user.uid, clientSideScanId, data.url, initialTimestamps)
-        .then(() => {
-            console.log(`[ScanForm - onSubmit] processScanInBackground for ${clientSideScanId} promise resolved (this doesn't indicate success/failure of the scan itself, check logs from the function).`);
-        })
-        .catch((e) => {
-            // This catch is for unhandled promise rejections from processScanInBackground itself, though errors *within* it should be caught internally.
-            console.error(`[ScanForm - onSubmit] CRITICAL Unhandled Error from processScanInBackground promise for ${clientSideScanId}:`, e);
-        });
-
-    // Show toast after initiating the background process and navigation
-    toast({ title: "Scan Queued", description: `Scan for ${data.url} has been queued. You've been redirected to the results page.` });
-
-    form.reset();
-    // setIsSubmitting(false); // Can be set if allowing multiple quick submissions, or rely on unmount/remount.
+    try {
+        const scanId = await startNewScan(data.url);
+        toast({ title: "Scan Queued", description: `Scan for ${data.url} has been queued. You've been redirected to the results page.` });
+        router.push(`/dashboard/scans/${scanId}?targetUrl=${encodeURIComponent(data.url)}`);
+        form.reset();
+    } catch(error: any) {
+        toast({ title: "Error Starting Scan", description: error.message || "An unknown error occurred.", variant: "destructive" });
+        setIsSubmitting(false);
+    }
   };
 
   return (

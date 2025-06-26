@@ -4,8 +4,6 @@
 import { useEffect, useState, useMemo } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
-import { doc, onSnapshot, Timestamp, updateDoc, serverTimestamp } from "firebase/firestore";
-import { db } from "@/lib/firebase";
 import type { Scan, AISecurityReport, Vulnerability, AIPatchSuggestion } from "@/types";
 import VulnerabilityItem from "@/components/dashboard/VulnerabilityItem";
 import ReportDisplay from "@/components/dashboard/ReportDisplay";
@@ -47,7 +45,7 @@ export default function ScanDetailPage() {
   const params = useParams();
   const searchParams = useSearchParams();
   const scanId = params.scanId as string;
-  const { user, loading: authLoading } = useAuth();
+  const { user, loading: authLoading, scans, updateScan } = useAuth();
   const router = useRouter();
   const { toast } = useToast();
 
@@ -64,156 +62,64 @@ export default function ScanDetailPage() {
 
 
   useEffect(() => {
-    let unsubscribe = () => {};
-    let timedOut = false; // Flag to prevent updates after timeout
-    let timerId: NodeJS.Timeout;
+    setLoading(true);
+    if (authLoading) return; // Wait for auth to be ready
 
-    console.log(`[ScanDetailPage] useEffect triggered. authLoading: ${authLoading}, user?.uid: ${user?.uid}, scanId: ${scanId}`);
-
-    if (authLoading) {
-      console.log("[ScanDetailPage] Auth is loading, waiting...");
-      setLoading(true); // Ensure loading is true while auth is resolving
-      return;
+    if (!user) {
+        toast({ title: "Authentication Required", description: "You must be logged in to view scan details.", variant: "destructive" });
+        router.push("/auth/login");
+        return;
     }
 
-    if (!user?.uid) {
-      console.error("[ScanDetailPage] User not authenticated after auth check. Redirecting to login.");
-      toast({ title: "Authentication Required", description: "You must be logged in to view scan details.", variant: "destructive" });
-      router.push("/auth/login");
-      setLoading(false);
-      return;
-    }
-
-    if (!scanId) {
-      console.log("[ScanDetailPage] scanId is not yet available. Waiting.");
-      setLoading(true); // Keep loading if scanId isn't available
-      return; // scanId might not be available on first render
-    }
+    const foundScan = scans.find(s => s.id === scanId);
     
-    // At this point, auth is done, user is available, and scanId is available.
-    console.log(`[ScanDetailPage] Setting up Firestore listener for user: ${user.uid}, scan: ${scanId}`);
-    setLoading(true); // Explicitly set loading when we start fetching
-
-    // If we have an initialTargetUrl and no scan data yet, create a placeholder
-    if (initialTargetUrl && !scan) {
-        console.log(`[ScanDetailPage] Using initialTargetUrl '${initialTargetUrl}' to create placeholder scan object.`);
+    if (foundScan) {
+        setScan(foundScan);
+    } else if (initialTargetUrl && user) {
+        // Create a placeholder if scan is new and not in the state yet
         setScan({
             id: scanId,
             userId: user.uid,
             targetUrl: initialTargetUrl,
             status: 'queued', 
-            createdAt: Timestamp.now(), 
-            updatedAt: Timestamp.now(),
-            aiScanResult: null,
-            aiSecurityReport: null,
+            createdAt: new Date(),
+            updatedAt: new Date(),
         });
+    } else if (!foundScan && scans.length > 0) {
+        // If scans are loaded but this one wasn't found, it's likely an error
+        toast({ title: "Scan Not Found", description: `The scan with ID ${scanId} could not be found.`, variant: "destructive" });
+        router.push("/dashboard/scans");
     }
-
-    const scanDocRef = doc(db, "users", user.uid, "scans", scanId);
-    
-    unsubscribe = onSnapshot(scanDocRef, (docSnap) => {
-      if (timedOut) {
-          console.log(`[ScanDetailPage] onSnapshot received data for ${scanId} but after timeout. Ignoring.`);
-          return;
-      }
-      console.log(`[ScanDetailPage] onSnapshot fired for ${scanId}. Exists: ${docSnap.exists()}`);
-      if (docSnap.exists()) {
-          const scanData = { id: docSnap.id, ...docSnap.data() } as Scan;
-          console.log(`[ScanDetailPage] Scan data received for ${scanId}:`, scanData);
-          setScan(scanData);
-          if (scanData.status === "failed" && scanData.errorMessage && scan?.status !== "failed") { // Only toast failure once
-              toast({ title: `Scan Failed: ${scanData.targetUrl}`, description: scanData.errorMessage, variant: "destructive" });
-          }
-          setLoading(false);
-      } else {
-          console.log(`[ScanDetailPage] Scan document ${scanId} does NOT exist (yet?) in Firestore for user ${user.uid}. Waiting for it or timeout.`);
-          // Don't set scan to null here if it already has the initialTargetUrl placeholder
-          if (!initialTargetUrl) { // if there's no placeholder, it means we are truly waiting
-            // setScan(null); // This might clear the placeholder too early if the doc just hasn't been created yet
-          }
-          // setLoading(false) will be handled by timeout if it never appears, or by a successful read
-      }
-    }, (error) => {
-      if (timedOut) {
-        console.log(`[ScanDetailPage] onSnapshot error for ${scanId} but after timeout. Ignoring.`);
-        return;
-      }
-      console.error(`[ScanDetailPage] Error in onSnapshot for ${scanId}:`, error);
-      toast({ title: "Error Fetching Scan", description: `Could not fetch scan details in real-time: ${error.message}. Mock data might be used if available.`, variant: "destructive" });
-      const mockScan = mockScansData.find(s => s.id === scanId); // Fallback for demo
-      if (mockScan) setScan(mockScan); else if (!initialTargetUrl) setScan(null); // Only set to null if no placeholder
-      setLoading(false);
-    });
-
-    timerId = setTimeout(() => {
-      timedOut = true; // Mark as timed out
-      if (loading && !scan?.aiScanResult && scan?.status !== 'completed' && scan?.status !== 'failed' ) { // More specific condition for timeout toast
-        console.warn(`[ScanDetailPage] Timeout for ${scanId}. Scan data for ${displayTargetUrl || scanId} not loaded or scan not completed/failed.`);
-        toast({
-          title: "Scan Not Found or Incomplete",
-          description: `The scan data for ${displayTargetUrl || scanId} could not be fully loaded after a timeout. Please try again or check history. Status: ${scan?.status || 'unknown'}`,
-          variant: "destructive"
-        });
-        if (!scan) { // If scan is still completely null
-             // router.push("/dashboard/scans"); // Consider removing auto-redirect
-        }
-      }
-      setLoading(false); // Ensure loading is set to false after timeout
-    }, 10000); // 10 seconds timeout
-
-    return () => {
-      console.log(`[ScanDetailPage] useEffect cleanup for ${scanId}. Unsubscribing from onSnapshot and clearing timeout.`);
-      unsubscribe();
-      clearTimeout(timerId);
-      timedOut = true; // Ensure onSnapshot doesn't act on stale listeners
-    };
-  // Using user.uid directly which is a primitive and stable if user object itself is stable or memoized by context.
-  // initialTargetUrl is memoized. router and toast are generally stable.
-  }, [scanId, user?.uid, authLoading, initialTargetUrl]); // Refined dependencies
+    setLoading(false);
+  }, [scanId, scans, authLoading, user, initialTargetUrl, router, toast]);
 
 
   const handleGenerateReport = async () => {
-    if (!scan || !scan.aiScanResult || !user || scan.id.startsWith("mock-") || scan.status !== 'completed') {
-      toast({ title: "Cannot Generate Report", description: "Scan data incomplete, user not found, scan is mock, or scan not completed.", variant: "destructive" });
+    if (!scan || !scan.aiScanResult || !user || scan.status !== 'completed') {
+      toast({ title: "Cannot Generate Report", description: "Scan data incomplete, user not found, or scan not completed.", variant: "destructive" });
       return;
-    }
-    if (!scan.id) {
-        toast({ title: "Scan ID Missing", description: "Cannot generate report without a valid scan ID.", variant: "destructive"});
-        return;
     }
 
     setIsGeneratingReport(true);
-    const scanDocRef = doc(db, "users", user.uid, "scans", scan.id);
+    await updateScan(scan.id, { status: "generating_report" });
     
     try {
-      setScan(prev => prev ? {...prev, status: "generating_report"} : null);
-      await updateDoc(scanDocRef, { status: "generating_report", updatedAt: serverTimestamp() });
-
       const aiReportOutput = await generateSecurityImprovementReport({
         scanResults: JSON.stringify(scan.aiScanResult),
       });
       
       const newReport: AISecurityReport = { report: aiReportOutput.report };
 
-      setScan(prev => prev ? {...prev, aiSecurityReport: newReport, status: "completed", updatedAt: Timestamp.now()} : null);
-      await updateDoc(scanDocRef, {
+      await updateScan(scan.id, {
         aiSecurityReport: newReport,
         status: "completed",
-        updatedAt: serverTimestamp(),
       });
       toast({ title: "Report Generated", description: "Security improvement report successfully generated." });
 
     } catch (error: any) {
       console.error("Error generating report:", error);
       toast({ title: "Report Generation Failed", description: error.message || "Could not generate report.", variant: "destructive" });
-      if (scan && scan.id && user) {
-        try {
-            await updateDoc(doc(db, "users", user.uid, "scans", scan.id), { status: "completed", updatedAt: serverTimestamp() });
-            setScan(prev => prev ? {...prev, status: "completed"} : null);
-        } catch (revertError) {
-             console.error("Failed to revert status to completed after report generation error", revertError);
-        }
-      }
+      await updateScan(scan.id, { status: "completed" });
     } finally {
       setIsGeneratingReport(false);
     }
@@ -261,7 +167,7 @@ export default function ScanDetailPage() {
   const displayTargetUrl = scan?.targetUrl || initialTargetUrl;
   const vulnerabilities = scan?.aiScanResult?.vulnerabilities || [];
 
-  if (loading && !scan?.status) { 
+  if (loading || authLoading) { 
     return (
       <div className="space-y-6">
         <Button variant="outline" onClick={() => router.back()} className="mb-4">
@@ -275,7 +181,7 @@ export default function ScanDetailPage() {
     );
   }
 
-  if (!scan && !loading) { 
+  if (!scan) { 
     return (
       <div className="text-center py-10">
          <Button variant="outline" onClick={() => router.back()} className="mb-6 absolute top-4 left-4">
@@ -299,9 +205,9 @@ export default function ScanDetailPage() {
             <div>
                 <h1 className="text-3xl font-bold tracking-tight font-headline truncate" title={displayTargetUrl || "Loading URL..."}>{displayTargetUrl || "Loading URL..."}</h1>
                 <p className="text-sm text-muted-foreground">
-                    Queued/Scanned on: {scan?.createdAt ? format(scan.createdAt.toDate(), "MMM dd, yyyy 'at' hh:mm a") : 'N/A'}
-                    {scan?.updatedAt && scan?.createdAt?.seconds !== scan?.updatedAt?.seconds && (
-                       ` (Updated: ${format(scan.updatedAt.toDate(), "hh:mm a")})`
+                    Queued/Scanned on: {scan?.createdAt ? format(scan.createdAt, "MMM dd, yyyy 'at' hh:mm a") : 'N/A'}
+                    {scan?.updatedAt && scan?.createdAt?.getSeconds() !== scan?.updatedAt?.getSeconds() && (
+                       ` (Updated: ${format(scan.updatedAt, "hh:mm a")})`
                     )}
                 </p>
             </div>
@@ -430,9 +336,9 @@ export default function ScanDetailPage() {
         scanId={scan?.id}
         reportData={scan?.aiSecurityReport}
         isLoading={isGeneratingReport}
-        onGenerateReport={scan?.status === 'completed' && scan?.aiScanResult && !scan?.aiSecurityReport && !scan?.id.startsWith("mock-") ? handleGenerateReport : undefined}
+        onGenerateReport={scan?.status === 'completed' && scan?.aiScanResult && !scan?.aiSecurityReport ? handleGenerateReport : undefined}
         scanTargetUrl={displayTargetUrl || undefined}
-        scanDate={scan?.createdAt ? scan.createdAt.toDate() : new Date()}
+        scanDate={scan?.createdAt ? scan.createdAt : new Date()}
         userDisplayName={user?.displayName || "User"}
       />
       {scan?.id.startsWith("mock-") && (

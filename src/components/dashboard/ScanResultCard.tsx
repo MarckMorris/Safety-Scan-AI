@@ -58,7 +58,7 @@ export default function ScanResultCard({ scan }: ScanResultCardProps) {
                     {scan.targetUrl.length > 40 ? `${scan.targetUrl.substring(0, 37)}...` : scan.targetUrl}
                 </CardTitle>
                 <CardDescription>
-                Scanned {formatDistanceToNow(scan.createdAt.toDate(), { addSuffix: true })}
+                Scanned {formatDistanceToNow(scan.createdAt, { addSuffix: true })}
                 </CardDescription>
             </div>
             <Badge variant={getStatusBadgeVariant(scan.status)} className="capitalize flex items-center gap-1">

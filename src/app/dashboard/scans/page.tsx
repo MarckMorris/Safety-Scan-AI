@@ -1,10 +1,9 @@
 
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { useAuth } from "@/context/AuthContext";
-import { collection, query, orderBy, onSnapshot, Timestamp } from "firebase/firestore";
-import { db } from "@/lib/firebase";
+import { Timestamp } from "firebase/firestore"; // This is a type-only import from a now-removed package, it should be fine but could be removed. It's used for the mock data structure.
 import type { Scan } from "@/types";
 import ScanResultCard from "@/components/dashboard/ScanResultCard";
 import { Input } from "@/components/ui/input";
@@ -20,10 +19,10 @@ import { format } from 'date-fns';
 import { useToast } from "@/hooks/use-toast";
 
 
-// Mock scan data for UI testing if Firestore fails or is empty - This will no longer be used directly as a fallback.
-export const mockScansData: Scan[] = [
+// Mock scan data for UI testing if the user has no scans.
+export const mockScansData: Omit<Scan, 'createdAt' | 'updatedAt'> & { createdAt: Timestamp, updatedAt: Timestamp }[] = [
   {
-    id: "mock1", userId: "mockUser123", targetUrl: "https://vulnerable-example.com", status: "completed",
+    id: "mock1", userId: "user-admin-01", targetUrl: "https://vulnerable-example.com", status: "completed",
     createdAt: Timestamp.fromDate(new Date(Date.now() - 86400000 * 2)), // 2 days ago
     updatedAt: Timestamp.fromDate(new Date(Date.now() - 86400000 * 2)),
     aiScanResult: {
@@ -36,19 +35,19 @@ export const mockScansData: Scan[] = [
     aiSecurityReport: { report: "Mock AI report: 1. Fix SQLi. 2. Sanitize XSS." }
   },
   {
-    id: "mock2", userId: "mockUser123", targetUrl: "https://another-site.org", status: "failed",
+    id: "mock2", userId: "user-admin-01", targetUrl: "https://another-site.org", status: "failed",
     createdAt: Timestamp.fromDate(new Date(Date.now() - 86400000 * 1)), // 1 day ago
     updatedAt: Timestamp.fromDate(new Date(Date.now() - 86400000 * 1)),
     errorMessage: "Mock Error: Target site was unreachable during scan.",
   },
   {
-    id: "mock3", userId: "mockUser123", targetUrl: "https://secure-app.dev", status: "completed",
+    id: "mock3", userId: "user-regular-01", targetUrl: "https://secure-app.dev", status: "completed",
     createdAt: Timestamp.fromDate(new Date()),
     updatedAt: Timestamp.fromDate(new Date()),
     aiScanResult: { summary: "Mock scan: secure-app.dev appears to be well configured.", vulnerabilities: [] },
   },
     {
-    id: "mock4", userId: "mockUser123", targetUrl: "https://api.internal.co", status: "scanning",
+    id: "mock4", userId: "user-regular-01", targetUrl: "https://api.internal.co", status: "scanning",
     createdAt: Timestamp.fromDate(new Date(Date.now() - 3600000 * 1)), // 1 hour ago
     updatedAt: Timestamp.fromDate(new Date(Date.now() - 3600000 * 1)),
   },
@@ -76,62 +75,34 @@ const getStatusIcon = (status: Scan["status"]) => {
 
 
 export default function ScanHistoryPage() {
-  const { user } = useAuth();
+  const { user, scans, loading } = useAuth();
   const { toast } = useToast();
-  const [scans, setScans] = useState<Scan[]>([]);
-  const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [filterStatus, setFilterStatus] = useState("all");
   const [filterSeverity, setFilterSeverity] = useState("all");
   const [sortOrder, setSortOrder] = useState("desc");
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
 
-
-  useEffect(() => {
-    if (!user) {
-      setLoading(false); 
-      // User not available, set scans to empty and loading to false.
-      // This might happen if AuthContext hasn't initialized or if logout occurs.
-      setScans([]);
-      return;
-    }
-
-    setLoading(true);
-    const q = query(
-        collection(db, "users", user.uid, "scans"), 
-        orderBy("createdAt", sortOrder === "desc" ? "desc" : "asc")
-    );
-    
-    const unsubscribe = onSnapshot(q, (querySnapshot) => {
-      const scansData = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Scan));
-      setScans(scansData);
-      setLoading(false);
-    }, (error) => {
-      console.error("Error fetching scans:", error);
-      toast({
-        title: "Error Fetching Scans",
-        description: "Could not load scan history from the database. Please try again later.",
-        variant: "destructive",
+  const filteredScans = useMemo(() => {
+    return scans
+      .filter(scan => 
+        scan.targetUrl.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        scan.id.toLowerCase().includes(searchTerm.toLowerCase())
+      )
+      .filter(scan => 
+        filterStatus === "all" || scan.status === filterStatus
+      )
+      .filter(scan => {
+        if (filterSeverity === "all" || !scan.aiScanResult?.vulnerabilities) return true;
+        return scan.aiScanResult.vulnerabilities.some(v => v.severity.toLowerCase() === filterSeverity.toLowerCase());
+      })
+      .sort((a, b) => {
+          if (sortOrder === 'asc') {
+              return a.createdAt.getTime() - b.createdAt.getTime();
+          }
+          return b.createdAt.getTime() - a.createdAt.getTime();
       });
-      setScans([]); // Set to empty array on error
-      setLoading(false);
-    });
-
-    return () => unsubscribe();
-  }, [user, sortOrder, toast]);
-
-  const filteredScans = scans
-    .filter(scan => 
-      scan.targetUrl.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      scan.id.toLowerCase().includes(searchTerm.toLowerCase())
-    )
-    .filter(scan => 
-      filterStatus === "all" || scan.status === filterStatus
-    )
-    .filter(scan => {
-      if (filterSeverity === "all" || !scan.aiScanResult?.vulnerabilities) return true;
-      return scan.aiScanResult.vulnerabilities.some(v => v.severity.toLowerCase() === filterSeverity.toLowerCase());
-    });
+  }, [scans, searchTerm, filterStatus, filterSeverity, sortOrder]);
   
   const handleExportAllReports = () => {
     // Placeholder for exporting all reports (e.g., as a zip of PDFs or a summary CSV)
@@ -142,7 +113,7 @@ export default function ScanHistoryPage() {
   };
 
 
-  if (loading && scans.length === 0) { 
+  if (loading) { 
     return (
         <div className="space-y-6">
             <div className="flex flex-col md:flex-row justify-between items-center gap-4">
@@ -277,7 +248,7 @@ export default function ScanHistoryPage() {
                             {scan.aiScanResult?.vulnerabilities?.length ?? 0}
                             {scan.aiScanResult?.vulnerabilities?.find(v => v.severity === 'Critical') && <Badge variant="destructive" className="ml-2 text-xs">Critical</Badge>}
                         </TableCell>
-                        <TableCell className="text-xs text-muted-foreground">{format(scan.createdAt.toDate(), "MMM dd, yyyy")}</TableCell>
+                        <TableCell className="text-xs text-muted-foreground">{format(scan.createdAt, "MMM dd, yyyy")}</TableCell>
                         <TableCell>
                             <Button variant="outline" size="sm" asChild>
                             <Link href={`/dashboard/scans/${scan.id}?targetUrl=${encodeURIComponent(scan.targetUrl)}`}>Details</Link>
@@ -304,7 +275,7 @@ export default function ScanHistoryPage() {
                 )}
                 </div>
             ) : null }
-             {loading && filteredScans.length === 0 && ( // Show loader only if still loading and no filtered scans yet
+             {loading && (
                 <div className="flex justify-center items-center py-12">
                     <Loader2 className="h-10 w-10 animate-spin text-primary" />
                     <p className="ml-3 text-muted-foreground">Loading scan history...</p>
@@ -315,5 +286,3 @@ export default function ScanHistoryPage() {
     </div>
   );
 }
-
-    

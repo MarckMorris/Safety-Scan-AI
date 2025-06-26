@@ -34,8 +34,8 @@ export default function LoginPage() {
   const form = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
     defaultValues: {
-      email: "",
-      password: "",
+      email: "user@example.com",
+      password: "password",
     },
   });
 
@@ -84,7 +84,7 @@ export default function LoginPage() {
         <Card className="w-full max-w-md shadow-2xl">
           <CardHeader className="text-center">
             <CardTitle className="text-2xl font-headline">Welcome Back</CardTitle>
-            <CardDescription>Sign in to access your dashboard and scan history.</CardDescription>
+            <CardDescription>Sign in to access your dashboard. <br/> Use <code className="bg-muted px-1 py-0.5 rounded">user@example.com</code> or <code className="bg-muted px-1 py-0.5 rounded">admin@example.com</code>. Any password works.</CardDescription>
           </CardHeader>
           <CardContent>
               {error && (
