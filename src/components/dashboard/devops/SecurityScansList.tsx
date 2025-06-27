@@ -26,11 +26,11 @@ export default function SecurityScansList() {
                             <ShieldAlert className="h-8 w-8 text-primary"/>
                             <div>
                                 <p className="font-semibold">{scan.type} Scan on <span className="font-mono text-primary/80">{scan.target}</span></p>
-                                <p className="text-sm text-muted-foreground">
+                                <div className="text-sm text-muted-foreground">
                                     {scan.vulnerabilities.critical > 0 && <Badge variant="destructive" className="mr-2">Critical: {scan.vulnerabilities.critical}</Badge>}
                                     {scan.vulnerabilities.high > 0 && <Badge variant="secondary" className="mr-2 bg-orange-500/80 text-white">High: {scan.vulnerabilities.high}</Badge>}
                                     {scan.vulnerabilities.critical === 0 && scan.vulnerabilities.high === 0 && <span className="text-green-600">No critical or high vulnerabilities</span>}
-                                </p>
+                                </div>
                             </div>
                         </div>
                         <Button variant="outline" size="sm" disabled>
