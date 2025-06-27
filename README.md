@@ -161,3 +161,5 @@ Contributions are welcome! Please follow standard Git practices: fork the reposi
 
 This project is licensed under the MIT License - see the LICENSE.md file for details (if one exists).
 If no license is present, it is proprietary.
+
+# Until 6/27/2025 everything is working properly
