@@ -67,3 +67,43 @@ export interface Project {
   createdAt: Date;
   updatedAt: Date;
 }
+
+export interface Build {
+  id: string;
+  commit: string;
+  status: "SUCCESS" | "FAILED" | "RUNNING" | "PENDING";
+  trigger: 'user' | 'webhook';
+  timestamp: Date;
+  logsUrl?: string;
+}
+
+export interface ProjectVulnerability {
+  id: string;
+  title: string;
+  severity: 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW';
+  location: string;
+  rawDetails?: Record<string, any>;
+  llmExplanation?: string;
+  llmImpact?: string;
+  llmRecommendations?: string;
+  llmCodeFix?: string;
+  bestPractices?: string;
+  status: 'OPEN' | 'FIXED' | 'ACKNOWLEDGED';
+  fixedAt?: Date;
+}
+
+export interface ProjectSecurityScan {
+  id: string;
+  scanType: "DAST" | "SAST" | "SCA" | "CLOUD_CONFIG";
+  status: "COMPLETED" | "RUNNING" | "FAILED";
+  target: string;
+  createdAt: Date;
+  finishedAt?: Date;
+  totalVulnerabilities: number;
+  criticalCount: number;
+  highCount: number;
+  mediumCount: number;
+  lowCount: number;
+  reportUrl?: string;
+  vulnerabilities?: ProjectVulnerability[];
+}
