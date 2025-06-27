@@ -9,6 +9,11 @@ import { Button } from "@/components/ui/button";
 import { ArrowLeft, GitBranch, Loader2, AlertCircle } from "lucide-react";
 import ProjectConfigForm from "@/components/dashboard/devops/ProjectConfigForm";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import PipelineStatusDisplay from "@/components/dashboard/devops/PipelineStatusDisplay";
+import DeploymentControlPanel from "@/components/dashboard/devops/DeploymentControlPanel";
+import BuildHistoryTable from "@/components/dashboard/devops/BuildHistoryTable";
+import SecurityScansList from "@/components/dashboard/devops/SecurityScansList";
 
 export default function ProjectDetailPage() {
   const params = useParams();
@@ -65,41 +70,27 @@ export default function ProjectDetailPage() {
         </div>
       </div>
 
-      {/* Placeholder for Pipeline Status Display */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Pipeline Status</CardTitle>
-          <CardDescription>Latest build and deployment status.</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <p className="text-muted-foreground text-sm">Status display coming soon.</p>
-        </CardContent>
-      </Card>
+      <Tabs defaultValue="pipeline" className="w-full">
+        <TabsList className="grid w-full grid-cols-3">
+          <TabsTrigger value="pipeline">CI/CD Pipeline</TabsTrigger>
+          <TabsTrigger value="security">Security Scans</TabsTrigger>
+          <TabsTrigger value="config">Configuration</TabsTrigger>
+        </TabsList>
+        
+        <TabsContent value="pipeline" className="mt-6 space-y-6">
+            <PipelineStatusDisplay project={project} />
+            <DeploymentControlPanel project={project} />
+            <BuildHistoryTable />
+        </TabsContent>
 
-      <ProjectConfigForm project={project} />
+        <TabsContent value="security" className="mt-6">
+            <SecurityScansList />
+        </TabsContent>
 
-      {/* Placeholder for Build History */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Build History</CardTitle>
-          <CardDescription>Recent build and deployment history.</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <p className="text-muted-foreground text-sm">Build history table coming soon.</p>
-        </CardContent>
-      </Card>
-
-      {/* Placeholder for Security Scans */}
-       <Card>
-        <CardHeader>
-          <CardTitle>Security Scans</CardTitle>
-          <CardDescription>Recent security scan results for this project.</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <p className="text-muted-foreground text-sm">Security scans list coming soon.</p>
-        </CardContent>
-      </Card>
-
+        <TabsContent value="config" className="mt-6">
+          <ProjectConfigForm project={project} />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

@@ -13,15 +13,15 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useState } from "react";
-import { Loader2, Save, AlertTriangle } from "lucide-react";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Loader2, Save } from "lucide-react";
+import { saveProjectConfiguration } from "@/lib/project-actions";
 
 const configSchema = z.object({
   gitProvider: z.enum(["github", "gitlab"], { required_error: "Please select a Git provider." }),
   repoUrl: z.string().url("Please enter a valid repository URL."),
   mainBranch: z.string().min(1, "Branch name is required."),
   workflowPath: z.string().min(1, "Workflow path is required."),
-  pat: z.string().min(1, "Personal Access Token is required to save configuration."),
+  pat: z.string().min(1, "A Personal Access Token is required to save or update the configuration."),
 });
 
 type ConfigFormValues = z.infer<typeof configSchema>;
@@ -31,7 +31,7 @@ interface ProjectConfigFormProps {
 }
 
 export default function ProjectConfigForm({ project }: ProjectConfigFormProps) {
-  const { updateProject } = useAuth();
+  const { user } = useAuth();
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -47,24 +47,24 @@ export default function ProjectConfigForm({ project }: ProjectConfigFormProps) {
   });
 
   const onSubmit = async (data: ConfigFormValues) => {
+    if (!user) {
+      toast({ title: "Not Authenticated", description: "You must be logged in to save settings.", variant: "destructive" });
+      return;
+    }
+    
     setIsSubmitting(true);
     try {
-      // In a real app, the PAT would be sent to a Cloud Function
-      // to be stored securely in Secret Manager, not in Firestore.
-      console.log("Submitting to (mocked) Cloud Function:", {
-        projectId: project.id,
-        ...data,
-      });
+      const result = await saveProjectConfiguration(user.uid, project.id, data);
 
-      // For now, we'll save the non-sensitive parts to Firestore.
-      const { pat, ...ciCdConfig } = data;
-      await updateProject(project.id, { ciCdConfig });
-
-      toast({
-        title: "Configuration Saved (Simulated)",
-        description: "Your CI/CD configuration has been updated. The PAT was not stored.",
-      });
-      form.reset({ ...data, pat: "" }); // Clear PAT field after submission
+      if (result.success) {
+        toast({
+          title: "Configuration Saved",
+          description: result.message,
+        });
+        form.reset({ ...data, pat: "" }); // Clear PAT field after submission
+      } else {
+        throw new Error(result.message);
+      }
     } catch (error: any) {
       toast({
         title: "Error Saving Configuration",
@@ -81,7 +81,7 @@ export default function ProjectConfigForm({ project }: ProjectConfigFormProps) {
       <CardHeader>
         <CardTitle>CI/CD Configuration</CardTitle>
         <CardDescription>
-          Connect your Git repository to enable automated builds, deployments, and scans.
+          Connect your Git repository to enable automated builds, deployments, and scans. Your Personal Access Token is required to verify and save changes but is never stored in the database.
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -102,7 +102,7 @@ export default function ProjectConfigForm({ project }: ProjectConfigFormProps) {
                       </FormControl>
                       <SelectContent>
                         <SelectItem value="github">GitHub</SelectItem>
-                        <SelectItem value="gitlab">GitLab</SelectItem>
+                        <SelectItem value="gitlab">GitLab (Coming Soon)</SelectItem>
                       </SelectContent>
                     </Select>
                     <FormMessage />
@@ -155,23 +155,15 @@ export default function ProjectConfigForm({ project }: ProjectConfigFormProps) {
               name="pat"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Personal Access Token</FormLabel>
+                  <FormLabel>Personal Access Token (PAT)</FormLabel>
                   <FormControl>
-                    <Input type="password" placeholder="Enter PAT to save changes..." {...field} />
+                    <Input type="password" placeholder="ghp_..." {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
               )}
             />
-            
-            <Alert variant="destructive">
-                <AlertTriangle className="h-4 w-4" />
-                <AlertTitle>Security Warning</AlertTitle>
-                <AlertDescription>
-                    This is a placeholder. In a real application, a Personal Access Token (PAT) would be sent directly to a secure backend function and never stored in the database.
-                </AlertDescription>
-            </Alert>
-            
+                        
             <Button type="submit" disabled={isSubmitting}>
               {isSubmitting ? (
                 <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Saving...</>
