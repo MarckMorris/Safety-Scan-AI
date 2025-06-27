@@ -29,12 +29,12 @@ const ProtectedRoute = ({ children }: ProtectedRouteProps): JSX.Element | null =
           <div className="max-w-lg p-8 bg-card border rounded-lg shadow-lg">
             <AlertTriangle className="h-12 w-12 text-destructive mx-auto mb-4" />
             <h1 className="text-2xl font-bold text-destructive">Security Rules Not Deployed</h1>
-            <p className="mt-2 text-muted-foreground">Great! Your database exists, but its security rules are blocking the app. This is the final setup step.</p>
+            <p className="mt-2 text-muted-foreground">The application needs updated permissions to access Firestore. This is a required final setup step.</p>
             <div className="mt-4 text-sm text-left text-card-foreground space-y-2">
-              <p>To fix this, you need to deploy the `firestore.rules` file to your Firebase project using the Firebase CLI:</p>
+              <p>To fix this, deploy the `firestore.rules` file to your Firebase project using the Firebase CLI:</p>
               <ol className="list-decimal list-inside space-y-4 bg-secondary/50 p-4 rounded-md font-mono text-xs">
                 <li>
-                  <strong>Install Firebase Tools:</strong>
+                  <strong>Install Firebase Tools (if you haven't):</strong>
                   <pre className="p-2 mt-1 bg-background border rounded">npm install -g firebase-tools</pre>
                 </li>
                 <li>
@@ -42,13 +42,12 @@ const ProtectedRoute = ({ children }: ProtectedRouteProps): JSX.Element | null =
                   <pre className="p-2 mt-1 bg-background border rounded">firebase login</pre>
                 </li>
                 <li>
-                  <strong>Deploy the rules:</strong>
+                  <strong>Deploy the rules from your project root:</strong>
                   <pre className="p-2 mt-1 bg-background border rounded">firebase deploy --only firestore:rules</pre>
-                  <span className="text-muted-foreground font-sans text-xs italic block mt-1">This command must be run from the root directory of your project.</span>
                 </li>
               </ol>
               <p className="pt-2 text-muted-foreground font-sans">
-                After running these commands, refresh this page.
+                After running these commands, refresh this page. The error should be gone.
               </p>
             </div>
           </div>
@@ -71,8 +70,7 @@ const ProtectedRoute = ({ children }: ProtectedRouteProps): JSX.Element | null =
                     <li>Choose a location for your database and click "Enable".</li>
                 </ol>
                 <p className="pt-2 text-muted-foreground">
-                  After creating the database, you will need to deploy the security rules I provided earlier.
-                  You can find instructions in your `README.md` file.
+                  After creating the database, you will need to deploy the security rules as instructed in your `README.md` file.
                 </p>
             </div>
             {process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID && (
