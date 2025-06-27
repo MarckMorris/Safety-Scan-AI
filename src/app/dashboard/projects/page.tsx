@@ -157,7 +157,7 @@ export default function DevOpsProjectsPage() {
                         {project.description || "No description provided."}
                       </p>
                        <p className="text-xs text-muted-foreground mt-4">
-                        Last updated: {formatDistanceToNow(project.updatedAt, { addSuffix: true })}
+                        Last updated: {project.updatedAt ? formatDistanceToNow(project.updatedAt, { addSuffix: true }) : 'just now'}
                       </p>
                     </CardContent>
                   </Card>
