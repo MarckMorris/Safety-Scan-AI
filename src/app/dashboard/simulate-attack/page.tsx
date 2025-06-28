@@ -37,7 +37,7 @@ export default function SimulateAttackPage() {
   const form = useForm<SimulationFormValues>({
     resolver: zodResolver(simulationFormSchema),
     defaultValues: {
-      targetUrl: "https://example.com",
+      targetUrl: "",
       attackType: "sqli",
     },
   });
@@ -108,7 +108,7 @@ export default function SimulateAttackPage() {
                         <FormItem>
                           <FormLabel>Target URL</FormLabel>
                           <FormControl>
-                            <Input placeholder="https://yourapp.com/login" {...field} disabled={isLoading} />
+                            <Input placeholder="https://example.com" {...field} disabled={isLoading} />
                           </FormControl>
                           <FormMessage />
                         </FormItem>

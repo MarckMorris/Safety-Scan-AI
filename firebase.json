@@ -4,11 +4,14 @@
     "rules": "firestore.rules"
   },
   "hosting": {
-    "public": "out",
-    "ignore": [
-      "firebase.json",
-      "**/.*",
-      "**/node_modules/**"
-    ]
+    "apphosting": {
+          "serviceId": "YOUR_SERVICE_ID", // Replace with your service ID
+          "app": "YOUR_FIREBASE_APP_ID" // Replace with your Firebase App ID
+        },
+        "ignore": [
+          "firebase.json",
+          "**/.*",
+          "**/node_modules/**"
+        ]
   }
 }
