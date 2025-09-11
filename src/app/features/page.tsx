@@ -1,6 +1,7 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { CheckSquare } from "lucide-react";
+import Image from "next/image";
 
 export default function FeaturesPage() {
   const featuresList = [
@@ -54,9 +55,11 @@ export default function FeaturesPage() {
       </div>
       
       <div className="text-center mt-16">
-        <img 
-            src="https://placehold.co/800x400.png?text=Feature+Highlight+Graphic" 
+        <Image 
+            src="https://picsum.photos/seed/features/800/400" 
             alt="Feature highlight" 
+            width={800}
+            height={400}
             className="mx-auto rounded-lg shadow-xl"
             data-ai-hint="technology abstract"
         />

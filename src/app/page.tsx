@@ -73,7 +73,7 @@ export default function HomePage() {
   return (
     <div className="flex flex-col items-center">
       {/* Hero Section */}
-      <section className="w-full py-20 md:py-32 bg-gradient-to-br from-background to-secondary/30">
+      <section className="w-full py-20 md:py-32 bg-card text-card-foreground">
         <div className="container mx-auto text-center px-4 md:px-6">
           <ShieldCheck className="w-24 h-24 text-primary mx-auto mb-6" />
           <h1 className="text-4xl md:text-6xl font-headline font-bold tracking-tight mb-6">
@@ -89,7 +89,7 @@ export default function HomePage() {
       </section>
 
       {/* Features Section */}
-      <section id="features" className="w-full py-16 md:py-24 bg-background">
+      <section id="features" className="w-full py-16 md:py-24 bg-card text-card-foreground">
         <div className="container mx-auto px-4 md:px-6">
           <h2 className="text-3xl md:text-4xl font-headline font-bold text-center mb-4">Powerful Security Features</h2>
           <p className="text-center text-muted-foreground mb-12 md:text-lg max-w-2xl mx-auto">
@@ -97,7 +97,7 @@ export default function HomePage() {
           </p>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
             {features.map((feature) => (
-              <Card key={feature.title} className="flex flex-col text-center items-center shadow-lg hover:shadow-xl transition-shadow duration-300">
+              <Card key={feature.title} className="flex flex-col text-center items-center shadow-lg hover:shadow-xl transition-shadow duration-300 bg-secondary/30">
                 <CardHeader>
                   {feature.icon}
                   <CardTitle className="mt-4 font-headline">{feature.title}</CardTitle>
@@ -112,7 +112,7 @@ export default function HomePage() {
       </section>
 
       {/* Visual Demo Section */}
-      <section className="w-full py-16 md:py-24 bg-secondary/30">
+      <section className="w-full py-16 md:py-24 bg-background">
         <div className="container mx-auto px-4 md:px-6">
           <h2 className="text-3xl md:text-4xl font-headline font-bold text-center mb-4">See Safety Scan AI in Action</h2>
           <p className="text-center text-muted-foreground mb-12 md:text-lg max-w-2xl mx-auto">
@@ -120,7 +120,7 @@ export default function HomePage() {
           </p>
           <div className="bg-card p-4 sm:p-6 md:p-8 rounded-xl shadow-2xl overflow-hidden">
             <Image
-              src="https://placehold.co/1200x600.png?text=App+Scanning+Demo"
+              src="https://picsum.photos/seed/dashboard/1200/600"
               alt="Safety Scan AI Demo"
               width={1200}
               height={600}
@@ -132,7 +132,7 @@ export default function HomePage() {
       </section>
 
       {/* Pricing Section */}
-      <section id="pricing" className="w-full py-16 md:py-24 bg-background">
+      <section id="pricing" className="w-full py-16 md:py-24 bg-card text-card-foreground">
         <div className="container mx-auto px-4 md:px-6">
           <h2 className="text-3xl md:text-4xl font-headline font-bold text-center mb-4">Simple, Transparent Pricing</h2>
           <p className="text-center text-muted-foreground mb-12 md:text-lg max-w-2xl mx-auto">
@@ -140,7 +140,7 @@ export default function HomePage() {
           </p>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8 items-stretch">
             {pricingPlans.map((plan) => (
-              <Card key={plan.name} className={`flex flex-col shadow-lg hover:shadow-xl transition-shadow duration-300 ${plan.popular ? 'border-2 border-primary ring-2 ring-primary/50' : ''}`}>
+              <Card key={plan.name} className={`flex flex-col shadow-lg hover:shadow-xl transition-shadow duration-300 bg-secondary/30 ${plan.popular ? 'border-2 border-primary ring-2 ring-primary/50' : ''}`}>
                 <CardHeader className="text-center">
                   {plan.popular && <div className="text-xs text-primary font-semibold mb-2 uppercase">Most Popular</div>}
                   <CardTitle className="text-2xl font-headline">{plan.name}</CardTitle>
@@ -172,7 +172,7 @@ export default function HomePage() {
       </section>
 
       {/* Final CTA */}
-      <section className="w-full py-16 md:py-24 bg-gradient-to-br from-background to-secondary/30">
+      <section className="w-full py-16 md:py-24 bg-background">
         <div className="container mx-auto text-center px-4 md:px-6">
           <h2 className="text-3xl md:text-4xl font-headline font-bold mb-6">Ready to Enhance Your Security?</h2>
           <p className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto mb-10">

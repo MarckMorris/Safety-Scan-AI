@@ -101,7 +101,7 @@ export default function DashboardLayout({
           </SidebarFooter>
         </Sidebar>
         <SidebarInset>
-            <div className="p-4 md:p-6 lg:p-8">
+            <div className="p-4 md:p-6 lg:p-8 bg-background text-foreground">
               {children}
             </div>
         </SidebarInset>

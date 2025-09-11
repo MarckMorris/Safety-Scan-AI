@@ -9,95 +9,97 @@ body {
 
 @layer base {
   :root {
-    --background: 210 25% 96.5%; /* Light Gray #F0F4F8 */
-    --foreground: 210 25% 25%; /* Darker Gray for text on light gray */
+    --background: 224 76% 48%; /* Vibrant Blue */
+    --foreground: 210 40% 98%; /* Light text for blue background */
 
-    --card: 0 0% 100%; /* White */
-    --card-foreground: 210 25% 20%; /* Darkest Gray for text on cards */
+    --card: 222 47% 11%; /* Dark Slate Blue/almost black for cards */
+    --card-foreground: 210 40% 98%;
 
-    --popover: 0 0% 100%; /* White */
-    --popover-foreground: 210 25% 20%;
+    --popover: 222 47% 11%;
+    --popover-foreground: 210 40% 98%;
 
-    --primary: 207 100% 73%; /* Sky Blue #74B9FF */
-    --primary-foreground: 207 100% 20%; /* Dark Blue for text on Sky Blue */
+    --primary: 221 83% 53%; /* Brighter blue for primary actions */
+    --primary-foreground: 210 40% 98%;
 
-    --secondary: 210 25% 90%; /* Slightly darker gray for secondary elements */
-    --secondary-foreground: 210 25% 25%; /* Darker gray text for secondary elements */
+    --secondary: 217 33% 17%; /* Darker blue for secondary elements */
+    --secondary-foreground: 210 40% 98%;
 
-    --muted: 210 25% 93%; /* Lighter gray for muted backgrounds */
-    --muted-foreground: 210 25% 45%; /* Medium gray for muted text */
+    --muted: 217 33% 17%;
+    --muted-foreground: 215 20% 65%;
 
-    --accent: 174 61% 37%; /* Teal #26A69A */
-    --accent-foreground: 0 0% 98%; /* White/very light text for teal accents */
+    --accent: 210 40% 98%; /* Light accent for text on dark backgrounds */
+    --accent-foreground: 222 47% 11%;
 
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 0 0% 98%;
+    --destructive: 0 63% 31%;
+    --destructive-foreground: 210 40% 98%;
 
-    --border: 210 25% 88%; /* Border for elements on light gray background */
-    --input: 210 25% 92%; /* Input background, slightly off-white/light gray */
-    --ring: 207 100% 65%; /* Ring color for focus, related to primary - a slightly darker Sky Blue */
+    --border: 217 33% 17%;
+    --input: 217 33% 17%;
+    --ring: 221 83% 53%;
 
     --radius: 0.5rem;
-
-    /* Chart colors (can be adjusted later if charts are implemented) */
-    --chart-1: 207 100% 73%; /* Sky Blue */
-    --chart-2: 174 61% 37%; /* Teal */
-    --chart-3: 210 25% 60%; /* Medium Gray */
-    --chart-4: 43 74% 66%; /* Default */
-    --chart-5: 27 87% 67%; /* Default */
     
-    /* Sidebar specific colors, can inherit or be customized */
-    --sidebar-background: 0 0% 100%; /* White sidebar, or slightly off-white */
-    --sidebar-foreground: 210 25% 25%;
-    --sidebar-primary: 207 100% 73%; /* Primary color for active items */
-    --sidebar-primary-foreground: 207 100% 20%;
-    --sidebar-accent: 210 25% 93%; /* Hover/accent color for sidebar items */
-    --sidebar-accent-foreground: 210 25% 25%;
-    --sidebar-border: 210 25% 88%;
-    --sidebar-ring: 207 100% 65%;
+    /* Chart colors */
+    --chart-1: 221 83% 53%;
+    --chart-2: 173 58% 39%;
+    --chart-3: 197 37% 24%;
+    --chart-4: 43 74% 66%;
+    --chart-5: 27 87% 67%;
+    
+    /* Sidebar specific colors */
+    --sidebar-background: 222 47% 11%; /* Same as card */
+    --sidebar-foreground: 210 40% 98%;
+    --sidebar-primary: 221 83% 53%;
+    --sidebar-primary-foreground: 210 40% 98%;
+    --sidebar-accent: 217 33% 17%;
+    --sidebar-accent-foreground: 210 40% 98%;
+    --sidebar-border: 217 33% 17%;
+    --sidebar-ring: 221 83% 53%;
   }
 
+  /* We will keep the .dark class definition in case you want to implement a theme switcher later,
+     but for now, the root theme is already dark and vibrant. */
   .dark {
-    --background: 210 20% 10%; /* Dark Gray/Blue */
-    --foreground: 210 20% 95%; /* Light Gray text */
+    --background: 224 76% 48%;
+    --foreground: 210 40% 98%;
 
-    --card: 210 20% 15%;
-    --card-foreground: 210 20% 95%;
+    --card: 222 47% 11%;
+    --card-foreground: 210 40% 98%;
 
-    --popover: 210 20% 15%;
-    --popover-foreground: 210 20% 95%;
+    --popover: 222 47% 11%;
+    --popover-foreground: 210 40% 98%;
 
-    --primary: 207 100% 65%; /* Slightly desaturated Sky Blue for dark mode */
-    --primary-foreground: 207 100% 15%;
+    --primary: 221 83% 53%;
+    --primary-foreground: 210 40% 98%;
 
-    --secondary: 210 20% 25%;
-    --secondary-foreground: 210 20% 95%;
+    --secondary: 217 33% 17%;
+    --secondary-foreground: 210 40% 98%;
 
-    --muted: 210 20% 20%;
-    --muted-foreground: 210 20% 70%;
+    --muted: 217 33% 17%;
+    --muted-foreground: 215 20% 65%;
 
-    --accent: 174 61% 45%; /* Slightly brighter Teal for dark mode */
-    --accent-foreground: 0 0% 98%;
+    --accent: 210 40% 98%;
+    --accent-foreground: 222 47% 11%;
 
-    --destructive: 0 70% 50%;
-    --destructive-foreground: 0 0% 98%;
+    --destructive: 0 63% 31%;
+    --destructive-foreground: 210 40% 98%;
 
-    --border: 210 20% 30%;
-    --input: 210 20% 25%;
-    --ring: 207 100% 55%;
+    --border: 217 33% 17%;
+    --input: 217 33% 17%;
+    --ring: 221 83% 53%;
     
-    --chart-1: 207 100% 65%;
-    --chart-2: 174 61% 45%;
-    --chart-3: 210 20% 50%;
+    --chart-1: 221 83% 53%;
+    --chart-2: 173 58% 39%;
+    --chart-3: 197 37% 24%;
 
-    --sidebar-background: 210 20% 12%;
-    --sidebar-foreground: 210 20% 90%;
-    --sidebar-primary: 207 100% 65%;
-    --sidebar-primary-foreground: 207 100% 15%;
-    --sidebar-accent: 210 20% 22%;
-    --sidebar-accent-foreground: 210 20% 90%;
-    --sidebar-border: 210 20% 30%;
-    --sidebar-ring: 207 100% 55%;
+    --sidebar-background: 222 47% 11%;
+    --sidebar-foreground: 210 40% 98%;
+    --sidebar-primary: 221 83% 53%;
+    --sidebar-primary-foreground: 210 40% 98%;
+    --sidebar-accent: 217 33% 17%;
+    --sidebar-accent-foreground: 210 40% 98%;
+    --sidebar-border: 217 33% 17%;
+    --sidebar-ring: 221 83% 53%;
   }
 }
 
