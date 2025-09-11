@@ -1,7 +1,7 @@
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { CheckCircle, ShieldCheck, ListChecks, DatabaseZap, Network, FileLock2, PackageSearch, BrainCircuit } from "lucide-react";
+import { CheckCircle2, ShieldCheck, ListChecks, DatabaseZap, Network, FileLock2, PackageSearch, BrainCircuit } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 
@@ -154,7 +154,7 @@ export default function HomePage() {
                   <ul className="space-y-3">
                     {plan.features.map((item, index) => (
                       <li key={index} className="flex items-center">
-                        <CheckCircle className="w-5 h-5 text-green-500 mr-2 shrink-0" />
+                        <CheckCircle2 className="w-5 h-5 text-green-500 mr-2 shrink-0" />
                         <span>{item}</span>
                       </li>
                     ))}

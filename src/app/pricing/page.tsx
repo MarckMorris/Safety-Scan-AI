@@ -1,7 +1,7 @@
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { CheckCircle } from "lucide-react";
+import { CheckCircle2 } from "lucide-react";
 import Link from "next/link";
 
 const pricingPlans = [
@@ -88,7 +88,7 @@ export default function PricingPage() {
               <ul className="space-y-3 my-6">
                 {plan.features.map((item, index) => (
                   <li key={index} className="flex items-start">
-                    <CheckCircle className="w-5 h-5 text-green-500 mr-2 shrink-0 mt-0.5" />
+                    <CheckCircle2 className="w-5 h-5 text-green-500 mr-2 shrink-0 mt-0.5" />
                     <span className="text-sm">{item}</span>
                   </li>
                 ))}
