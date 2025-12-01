@@ -22,7 +22,7 @@ The development of Safety Scan AI followed an iterative, module-based approach, 
 
 ### Phase 1: Foundation and Core UI
 - **Tech Stack Setup**: The project was initialized with a modern, robust stack: **Next.js** (using the App Router) for the frontend framework, **Firebase** for backend services (Authentication and Firestore), and **Tailwind CSS** with **ShadCN UI** for a professional and responsive design system.
-- **UI/UX Scaffolding**: Initial static pages and navigation were created, including the homepage, pricing, features, and a basic dashboard layout. The focus was on establishing a clean, modern aesthetic inspired by the user's design prompts.
+- **UI/UX Scaffolding**: Initial static pages and navigation were created, including the homepage, pricing, features, and a basic dashboard layout. The focus was on establishing a clean, modern aesthetic inspired by the user's design ideas.
 
 ### Phase 2: Core AI Functionality
 - **Genkit Integration**: The AI capabilities were built using **Genkit**, a framework for developing AI-powered flows.
