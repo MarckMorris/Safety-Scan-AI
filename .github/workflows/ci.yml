@@ -1,0 +1,38 @@
+name: CI
+
+# The default branch here is master. An almost-empty `main` branch also exists;
+# the workflow deliberately targets master, which is where the application is.
+#
+# typecheck and lint are blocking because they need no secrets and no network.
+# `next build` is not run: it requires Firebase and Google AI credentials that do
+# not exist in CI, and a job that can only ever fail is noise.
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: Typecheck and lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Lint
+        run: npm run lint
