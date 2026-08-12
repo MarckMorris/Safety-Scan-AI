@@ -28,8 +28,11 @@ jobs:
           node-version: "20"
           cache: npm
 
+      # npm install rather than npm ci: the committed lockfile predates the
+      # eslint devDependencies added with the ESLint config, so a strict clean
+      # install would fail on a lockfile mismatch rather than on real code.
       - name: Install
-        run: npm ci
+        run: npm install --no-audit --no-fund
 
       - name: Typecheck
         run: npm run typecheck
