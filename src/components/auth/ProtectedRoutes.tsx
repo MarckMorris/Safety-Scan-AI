@@ -34,7 +34,7 @@ const ProtectedRoute = ({ children }: ProtectedRouteProps): JSX.Element | null =
               <p>To fix this, deploy the `firestore.rules` file to your Firebase project using the Firebase CLI:</p>
               <ol className="list-decimal list-inside space-y-4 bg-secondary/50 p-4 rounded-md font-mono text-xs">
                 <li>
-                  <strong>Install Firebase Tools (if you haven't):</strong>
+                  <strong>Install Firebase Tools (if you haven&apos;t):</strong>
                   <pre className="p-2 mt-1 bg-background border rounded">npm install -g firebase-tools</pre>
                 </li>
                 <li>
@@ -65,9 +65,9 @@ const ProtectedRoute = ({ children }: ProtectedRouteProps): JSX.Element | null =
                 <p>To fix this, you need to create a Firestore database in your Firebase project:</p>
                 <ol className="list-decimal list-inside space-y-1 bg-secondary/50 p-3 rounded-md">
                     <li>Click the button below to go to the Firestore Console.</li>
-                    <li>Click <strong>"Create database"</strong>.</li>
+                    <li>Click <strong>&quot;Create database&quot;</strong>.</li>
                     <li>Start in <strong>Production mode</strong>.</li>
-                    <li>Choose a location for your database and click "Enable".</li>
+                    <li>Choose a location for your database and click &quot;Enable&quot;.</li>
                 </ol>
                 <p className="pt-2 text-muted-foreground">
                   After creating the database, you will need to deploy the security rules as instructed in your `README.md` file.
