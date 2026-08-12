@@ -222,7 +222,7 @@ export default function ScanDetailPage() {
       
       <ReportDisplay
         scanId={scan?.id}
-        reportData={scan?.aiSecurityReport}
+        reportData={scan?.aiSecurityReport ?? undefined}
         isLoading={isGeneratingReport || scan?.status === 'generating_report'}
         onGenerateReport={scan?.status === 'completed' && scan?.aiScanResult && !scan?.aiSecurityReport ? handleGenerateReport : undefined}
         scanTargetUrl={displayTargetUrl || undefined}
